@@ -1,38 +1,5 @@
-//
-// Copyright (c) Microsoft. All rights reserved.
-// This code is licensed under the MIT License (MIT).
-// THIS CODE IS PROVIDED *AS IS* WITHOUT WARRANTY OF
-// ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY
-// IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR
-// PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
-//
-// Developed by Minigraph
-//
-// Author:  James Stanard
-//
-
-#include "GameCore.h"
-#include "CameraController.h"
-#include "BufferManager.h"
-#include "Camera.h"
-#include "CommandContext.h"
-#include "TemporalEffects.h"
-#include "MotionBlur.h"
-#include "DepthOfField.h"
-#include "PostEffects.h"
-#include "SSAO.h"
-#include "FXAA.h"
-#include "SystemTime.h"
-#include "TextRenderer.h"
-#include "ParticleEffectManager.h"
-#include "GameInput.h"
-#include "SponzaRenderer.h"
-#include "glTF.h"
-#include "Renderer.h"
-#include "Model.h"
-#include "ModelLoader.h"
-#include "ShadowCamera.h"
-#include "Display.h"
+#include "RestirGBufferGen.h"
+#include "RestirGlobalResource.h"
 
 #define LEGACY_RENDERER
 
@@ -43,11 +10,11 @@ using namespace std;
 
 using Renderer::MeshSorter;
 
-class ModelViewer : public GameCore::IGameApp
+class RestirApp : public GameCore::IGameApp
 {
 public:
 
-    ModelViewer( void ) {}
+    RestirApp( void ) {}
 
     virtual void Startup( void ) override;
     virtual void Cleanup( void ) override;
@@ -65,9 +32,11 @@ private:
 
     ModelInstance m_ModelInst;
     ShadowCamera m_SunShadowCamera;
+
+    CGBufferGenPass m_GBufferGenPass;
 };
 
-CREATE_APPLICATION( ModelViewer )
+CREATE_APPLICATION( RestirApp )
 
 ExpVar g_SunLightIntensity("Viewer/Lighting/Sun Light Intensity", 4.0f, 0.0f, 16.0f, 0.1f);
 NumVar g_SunOrientation("Viewer/Lighting/Sun Orientation", -0.5f, -100.0f, 100.0f, 0.1f );
@@ -144,16 +113,19 @@ void LoadIBLTextures()
         g_IBLSet.Increment();
 }
 
-void ModelViewer::Startup( void )
+void RestirApp::Startup( void )
 {
-    MotionBlur::Enable = true;
-    TemporalEffects::EnableTAA = true;
+    MotionBlur::Enable = false;
+    TemporalEffects::EnableTAA = false;
     FXAA::Enable = false;
     PostEffects::EnableHDR = true;
     PostEffects::EnableAdaptation = true;
     SSAO::Enable = true;
 
     Renderer::Initialize();
+
+    InitGlobalResource();
+    m_GBufferGenPass.Init();
 
     LoadIBLTextures();
 
@@ -193,7 +165,7 @@ void ModelViewer::Startup( void )
         m_CameraController.reset(new OrbitCamera(m_Camera, m_ModelInst.GetBoundingSphere(), Vector3(kYUnitVector)));
 }
 
-void ModelViewer::Cleanup( void )
+void RestirApp::Cleanup( void )
 {
     m_ModelInst = nullptr;
 
@@ -211,7 +183,7 @@ namespace Graphics
     extern EnumVar DebugZoom;
 }
 
-void ModelViewer::Update( float deltaT )
+void RestirApp::Update( float deltaT )
 {
     ScopedTimer _prof(L"Update State");
 
@@ -228,16 +200,6 @@ void ModelViewer::Update( float deltaT )
 
     gfxContext.Finish();
 
-    // We use viewport offsets to jitter sample positions from frame to frame (for TAA.)
-    // D3D has a design quirk with fractional offsets such that the implicit scissor
-    // region of a viewport is floor(TopLeftXY) and floor(TopLeftXY + WidthHeight), so
-    // having a negative fractional top left, e.g. (-0.25, -0.25) would also shift the
-    // BottomRight corner up by a whole integer.  One solution is to pad your viewport
-    // dimensions with an extra pixel.  My solution is to only use positive fractional offsets,
-    // but that means that the average sample position is +0.5, which I use when I disable
-    // temporal AA.
-    TemporalEffects::GetJitterOffset(m_MainViewport.TopLeftX, m_MainViewport.TopLeftY);
-
     m_MainViewport.Width = (float)g_SceneColorBuffer.GetWidth();
     m_MainViewport.Height = (float)g_SceneColorBuffer.GetHeight();
     m_MainViewport.MinDepth = 0.0f;
@@ -249,11 +211,10 @@ void ModelViewer::Update( float deltaT )
     m_MainScissor.bottom = (LONG)g_SceneColorBuffer.GetHeight();
 }
 
-void ModelViewer::RenderScene( void )
+void RestirApp::RenderScene( void )
 {
     GraphicsContext& gfxContext = GraphicsContext::Begin(L"Scene Render");
 
-    uint32_t FrameIndex = TemporalEffects::GetFrameIndexMod2();
     const D3D12_VIEWPORT& viewport = m_MainViewport;
     const D3D12_RECT& scissor = m_MainScissor;
 
@@ -308,7 +269,6 @@ void ModelViewer::RenderScene( void )
 
         SSAO::Render(gfxContext, m_Camera);
 
-        if (!SSAO::DebugDraw)
         {
             ScopedTimer _outerprof(L"Main Render", gfxContext);
 
@@ -344,21 +304,6 @@ void ModelViewer::RenderScene( void )
             sorter.RenderMeshes(MeshSorter::kTransparent, gfxContext, globals);
         }
     }
-
-    // Some systems generate a per-pixel velocity buffer to better track dynamic and skinned meshes.  Everything
-    // is static in our scene, so we generate velocity from camera motion and the depth buffer.  A velocity buffer
-    // is necessary for all temporal effects (and motion blur).
-    MotionBlur::GenerateCameraVelocityBuffer(gfxContext, m_Camera, true);
-
-    TemporalEffects::ResolveImage(gfxContext);
-
-    ParticleEffectManager::Render(gfxContext, m_Camera, g_SceneColorBuffer, g_SceneDepthBuffer,  g_LinearDepth[FrameIndex]);
-
-    // Until I work out how to couple these two, it's "either-or".
-    if (DepthOfField::Enable)
-        DepthOfField::Render(gfxContext, m_Camera.GetNearClip(), m_Camera.GetFarClip());
-    else
-        MotionBlur::RenderObjectBlur(gfxContext, g_VelocityBuffer);
 
     gfxContext.Finish();
 }
