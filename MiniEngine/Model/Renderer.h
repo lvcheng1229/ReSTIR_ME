@@ -70,7 +70,7 @@ namespace Renderer
     class MeshSorter
     {
     public:
-		enum BatchType { kDefault, kShadows };
+		enum BatchType { kDefault, kShadows, kRestirGBuffer };
         enum DrawPass { kZPass, kOpaque, kTransparent, kNumPasses };
 
 		MeshSorter(BatchType type)
@@ -109,9 +109,22 @@ namespace Renderer
             const Joint* skeleton = nullptr);
 
         void Sort();
-
+        
         void RenderMeshes(DrawPass pass, GraphicsContext& context, GlobalConstants& globals);
 
+        struct SortObject
+        {
+            const Mesh* mesh;
+            const Joint* skeleton;
+            D3D12_GPU_VIRTUAL_ADDRESS meshCBV;
+            D3D12_GPU_VIRTUAL_ADDRESS materialCBV;
+            D3D12_GPU_VIRTUAL_ADDRESS bufferPtr;
+        };
+
+        std::vector<SortObject>& GetSortObject()
+        {
+            return m_SortObjects;
+        }
     private:
 
         struct SortKey
@@ -129,14 +142,7 @@ namespace Renderer
             };
         };
 
-        struct SortObject
-        {
-            const Mesh* mesh;
-            const Joint* skeleton;
-            D3D12_GPU_VIRTUAL_ADDRESS meshCBV;
-            D3D12_GPU_VIRTUAL_ADDRESS materialCBV;
-            D3D12_GPU_VIRTUAL_ADDRESS bufferPtr;
-        };
+        
 
         std::vector<SortObject> m_SortObjects;
         std::vector<uint64_t> m_SortKeys;

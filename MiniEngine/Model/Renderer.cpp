@@ -497,6 +497,14 @@ void MeshSorter::AddMesh( const Mesh& mesh, float distance,
 		m_SortKeys.push_back(key.value);
 		m_PassCounts[kZPass]++;
 	}
+    else if(m_BatchType == kRestirGBuffer)
+    {
+        key.passID = kOpaque;
+        key.psoIdx = (~0u);
+        key.key = dist.u;
+        m_SortKeys.push_back(key.value);
+        m_PassCounts[kOpaque]++;
+    }
     else if (mesh.psoFlags & PSOFlags::kAlphaBlend)
     {
         key.passID = kTransparent;

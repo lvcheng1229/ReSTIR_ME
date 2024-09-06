@@ -29,6 +29,7 @@ namespace Graphics
     extern ColorBuffer g_HorizontalBuffer;  // For separable (bicubic) upsampling
 
     extern ColorBuffer g_SceneGBufferA;     // R16G16B16A16_FLOAT normal
+    extern ColorBuffer g_SceneGBufferB;     // R16G16B16A16_FLOAT world position todo
 
     extern ColorBuffer g_VelocityBuffer;    // R10G10B10  (3D velocity)
     extern ShadowBuffer g_ShadowBuffer;

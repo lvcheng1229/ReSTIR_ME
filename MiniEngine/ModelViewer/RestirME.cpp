@@ -285,6 +285,15 @@ void RestirApp::RenderScene( void )
                 shadowSorter.RenderMeshes(MeshSorter::kZPass, gfxContext, globals);
             }
 
+            {
+                MeshSorter gBufferGenwSorter(MeshSorter::kRestirGBuffer);
+                gBufferGenwSorter.SetCamera(m_Camera);
+                m_ModelInst.Render(gBufferGenwSorter);
+                gBufferGenwSorter.Sort();
+
+                //m_GBufferGenPass.GenerateGBuffer(gfxContext, globals, gBufferGenwSorter.GetSortObject());
+            }
+
             gfxContext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
             gfxContext.ClearColor(g_SceneColorBuffer);
 
