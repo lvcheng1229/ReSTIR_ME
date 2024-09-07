@@ -120,7 +120,7 @@ void InitialSamplingRayGen()
         float3x3 tangent_basis = GetTangentBasisFrisvad(world_normal);
 
         float3 local_ray_direction = hemi_sphere_sample.xyz;
-        float3 world_ray_direction = mul(local_ray_direction, tangent_basis):
+        float3 world_ray_direction = normalize(mul(local_ray_direction, tangent_basis));
 
         FRayDesc ray;
         ray.Origin = world_position + world_normal * 0.005;

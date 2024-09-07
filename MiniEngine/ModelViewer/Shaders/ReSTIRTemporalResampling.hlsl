@@ -33,16 +33,13 @@ RWTexture2D<float>  rw_reservoir_hit_distance : register(u2);
 RWTexture2D<float3> rw_reservoir_hit_normal : register(u3);
 RWTexture2D<float3> rw_reservoir_weights : register(u4);
 
-
-
-
 //half resolution
 [numthreads(GROUP_SIZE, GROUP_SIZE, 1)]
 void TemporalResamplingCS(uint2 dispatch_thread_id : SV_DispatchThreadID)
 {
     uint2 reservoir_coord = dispatch_thread_id.xy;
     float3 world_position = downsampled_world_pos[reservoir_coord];
-    if(all(reservoir_coord < g_restir_texturesize) && any(world_position > float3(0,0,0)))
+    if(all(reservoir_coord < g_restir_texturesize) && any(world_position != float3(0,0,0)))
     {
         SReservoir current_reservoir = LoadReservoir(reservoir_coord, reservoir_ray_direction, reservoir_ray_radiance, reservoir_hit_distance, reservoir_hit_normal, reservoir_weights);
 
@@ -67,7 +64,7 @@ void TemporalResamplingCS(uint2 dispatch_thread_id : SV_DispatchThreadID)
 
             bool is_history_nearby = (distance(history_world_position, world_position) < 10.0f) && (abs(dot(history_world_normal,world_normal) < 0.25));
 
-            if(any(history_world_position > float3(0,0,0)) && is_history_nearby)
+            if(any(history_world_position != float3(0,0,0)) && is_history_nearby)
             {
                 SReservoir history_reservoir = LoadReservoir(reservoir_coord, history_reservoir_ray_direction, history_reservoir_ray_radiance, history_reservoir_hit_distance, history_reservoir_hit_normal, history_reservoir_weights);
                 

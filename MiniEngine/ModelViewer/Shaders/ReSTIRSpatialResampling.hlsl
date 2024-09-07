@@ -1,5 +1,8 @@
 
 #define GROUP_SIZE 16
+
+Texture3D<float> stbn_scalar_tex: register(t7);
+
 #include "ReSTIRCommon.hlsl"
 
 // ping-pong pass, texture resources are from the temporal resampling
@@ -54,7 +57,7 @@ void SpatialResamplingCS(uint2 dispatch_thread_id : SV_DispatchThreadID)
 {
     uint2 reservoir_coord = dispatch_thread_id.xy;
     float3 world_position = downsampled_world_pos[reservoir_coord];
-    if(all(reservoir_coord < g_restir_texturesize) && any(world_position > float3(0,0,0)))
+    if(all(reservoir_coord < g_restir_texturesize) && any(world_position != float3(0,0,0)))
     {
         SReservoir current_reservoir = LoadReservoir(reservoir_coord, reservoir_ray_direction, reservoir_ray_radiance, reservoir_hit_distance, reservoir_hit_normal, reservoir_weights);
 
@@ -75,7 +78,7 @@ void SpatialResamplingCS(uint2 dispatch_thread_id : SV_DispatchThreadID)
             int2 neighbor_reservoir_coord = clamp(reservoir_offset_int + reservoir_coord, int2(0,0), int2(g_restir_texturesize.xy) - int2(1,1));
 
             float3 neighbor_world_position = downsampled_world_pos[neighbor_reservoir_coord];
-            if(any(neighbor_world_position > float3(0,0,0)))
+            if(any(neighbor_world_position != float3(0,0,0)))
             {
                 SReservoir neighbor_reservoir = LoadReservoir(neighbor_reservoir_coord, reservoir_ray_direction, reservoir_ray_radiance, reservoir_hit_distance, reservoir_hit_normal, reservoir_weights);
 
@@ -85,9 +88,17 @@ void SpatialResamplingCS(uint2 dispatch_thread_id : SV_DispatchThreadID)
                 if(is_history_nearby)
                 {
                     float jacobian = CalculateJacobian(world_position, neighbor_world_position, neighbor_reservoir);
-                    
+                    float swap_noise = GetBlueNoiseScalar(reservoir_coord, g_current_frame_index * num_spatial_samples + sample_index);
+                    MergeReservoirSample(current_reservoir, neighbor_reservoir, neighbor_reservoir.m_sample.pdf * jacobian, swap_noise);
                 }
             }
         }
+
+        current_reservoir.comb_weight = current_reservoir.weight_sum / max(current_reservoir.M * current_reservoir.m_sample.pdf, 0.0001f);
+        StoreReservoir(reservoir_coord, current_reservoir, rw_reservoir_ray_direction, rw_reservoir_ray_radiance, rw_reservoir_hit_distance, rw_reservoir_hit_normal, rw_reservoir_weights);
+    }
+    else
+    {
+        rw_reservoir_ray_direction[reservoir_coord] = float4(0,0,0,0);
     }
 }

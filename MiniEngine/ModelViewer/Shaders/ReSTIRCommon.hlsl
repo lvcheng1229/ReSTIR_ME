@@ -7,6 +7,8 @@
     uint g_current_frame_index;\
     float3 g_sun_direction;\
     float3 g_sun_intensity;\
+    float2 g_full_screen_texsize;\
+    float3 g_camera_worldpos;\
 
 
 struct SSample
