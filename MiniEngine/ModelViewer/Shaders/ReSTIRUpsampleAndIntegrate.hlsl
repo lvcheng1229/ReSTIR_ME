@@ -10,8 +10,8 @@ Texture2D<float>  reservoir_hit_distance : register(t2);
 Texture2D<float3> reservoir_hit_normal : register(t3);
 Texture2D<float3> reservoir_weights : register(t4);
 
-Texture2D<float3> gbuffer_world_pos : register(t5);
-Texture2D<float3> gbuffer_world_normal : register(t5); // xyz, world normal, w roughness
+Texture2D<float4> gbuffer_world_pos : register(t5);
+Texture2D<float4> gbuffer_world_normal : register(t5); // xyz, world normal, w roughness
 
 Texture2D<float3> fullres_scene_depth : register(t5);
 
@@ -19,23 +19,6 @@ Texture2D<float3> downsampled_world_pos : register(t5);
 
 RWTexture2D<float3> output_diffuse_indirect : register(u0);
 RWTexture2D<float3> output_specular_indirect : register(u1);
-RWTexture2D<float> output_resolve_variance : register(u2);
-
-//From UnrealEngine
-float Luma(float3 color)
-{
-    return dot(color, float3(0.2,0.7,0.1));
-}
-
-float3 ToneMappingLighting(float3 light)
-{
-    return light / (1 + Luma(light))
-}
-
-float3 InverseToneMappingLight(float3 light)
-{
-    return light / (1.0 - Luma(light));
-}
 
 float D_GGX( float a2, float NoH )
 {
@@ -47,10 +30,12 @@ float D_GGX( float a2, float NoH )
 void UpscaleAndIntegrateCS(uint2 dispatch_thread_id : SV_DispatchThreadID)
 {
     uint2 current_pixel_pos = dispatch_thread_id;
-    float3 world_position = gbuffer_world_pos[current_pixel_pos];
+    float3 world_position = gbuffer_world_pos[current_pixel_pos].xyz;
     if(all(current_pixel_pos < g_full_screen_texsize) && any(world_position != float3(0,0,0)))
     {
-        float3 world_normal = gbuffer_world_normal[current_pixel_pos];
+        float3 world_normal = gbuffer_world_normal[current_pixel_pos].xyz;
+        float roughness = gbuffer_world_normal[current_pixel_pos].z;
+
         float4 scene_plane = float4(world_normal, dot(world_position, world_normal));
         float3 vec_to_camera = g_camera_worldpos - world_position;
         float3 view_direction = normalize(vec_to_camera);
@@ -66,8 +51,8 @@ void UpscaleAndIntegrateCS(uint2 dispatch_thread_id : SV_DispatchThreadID)
         float3 weighted_specular_lighting = 0
         float total_weight = 0;
 
-        float mean = 0.0;
-        float s = 0.0;
+        //float mean = 0.0;
+        //float s = 0.0;
 
         for(uint sample_index; sample_index < upscale_number_sample; sample_index++)
         {
@@ -93,7 +78,7 @@ void UpscaleAndIntegrateCS(uint2 dispatch_thread_id : SV_DispatchThreadID)
                 // specular lighting
                 float3 H = normalize(view_direction, reservoir_sample.m_sample.ray_direction);
                 float NoH = saturate(dot(world_normal, H));
-                float D = D_GGX();
+                float D = D_GGX(,NoH);
                 const float Vis_Implicit = 0.25;
                 weighted_specular_lighting += ToneMappingLighting(sample_light * D * Vis_Implicit) * depth_weight;
 
@@ -101,19 +86,26 @@ void UpscaleAndIntegrateCS(uint2 dispatch_thread_id : SV_DispatchThreadID)
                 total_weight += depth_weight;
                 
                 // bilateral filter
-                float sample_luma = Luma(sample_light);
-                float old_mean = mean;
-                mean += (depth_weight / total_weight) * (sample_luma - old_mean);
-                s += depth_weight * (sample_luma - mean) * (sample_luma - old_mean);
+                //float sample_luma = Luma(sample_light);
+                //float old_mean = mean;
+                //mean += (depth_weight / total_weight) * (sample_luma - old_mean);
+                //s += depth_weight * (sample_luma - mean) * (sample_luma - old_mean);
             }
         }
 
          float3 diffuse_lighting = (total_weight > 0.0) ? weighted_diffuse_lighting / total_weight : 0.0;
          float3 specular_lighting = (total_weight > 0.0) ? weighted_specular_lighting / total_weight : 0.0;
-         float reservoir_radiance = (total_weight > 0.0) ? s / total_weight : 0.0;
+         //float reservoir_radiance = (total_weight > 0.0) ? s / total_weight : 0.0;
 
-         const float disocclusion_variance = 1.0;
-         
+         output_diffuse_indirect[current_pixel_pos] = diffuse_lighting / 3.1415926535;
+         output_specular_indirect[current_pixel_pos] = specular_lighting;
+         //output_resolve_variance[current_pixel_pos] = min(reservoir_radiance, DISOCCLUSION_VARIANCE - 0.1f);
+    }
+    else
+    {
+        output_diffuse_indirect[current_pixel_pos] = float3(0,0,0);
+        output_specular_indirect[current_pixel_pos] = float3(0,0,0);
+        //output_resolve_variance[current_pixel_pos] = 0.0f;
     }
 
    

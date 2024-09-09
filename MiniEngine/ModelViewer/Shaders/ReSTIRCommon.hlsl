@@ -11,6 +11,8 @@
     float3 g_camera_worldpos;\
 
 
+#define DISOCCLUSION_VARIANCE 1.0
+
 struct SSample
 {
     float3 ray_direction;
@@ -69,6 +71,54 @@ float GetBlueNoiseScalar(uint2 screen_position,uint frame_index)
     return stbn_scalar_tex.Load(texture_coord_3d.xyz,0).x;
 }
 
+//From UnrealEngine
+float acosFast(float inX) 
+{
+    float x = abs(inX);
+    float res = -0.156583f * x + (0.5 * PI);
+    res *= sqrt(1.0f - x);
+    return (inX >= 0) ? res : PI - res;
+}
+
+float Luma(float3 color)
+{
+    return dot(color, float3(0.2,0.7,0.1));
+}
+
+float3 ToneMappingLighting(float3 light)
+{
+    return light / (1 + Luma(light))
+}
+
+float3 InverseToneMappingLight(float3 light)
+{
+    return light / (1.0 - Luma(light));
+}
+
+uint3 Rand3DPCG32(int3 p)
+{
+	uint3 v = uint3(p);
+	v = v * 1664525u + 1013904223u;
+
+	v.x += v.y*v.z;
+	v.y += v.z*v.x;
+	v.z += v.x*v.y;
+
+	v ^= v >> 16u;
+
+	v.x += v.y*v.z;
+	v.y += v.z*v.x;
+	v.z += v.x*v.y;
+
+	return v;
+}
+
+float2 Hammersley16( uint Index, uint NumSamples, uint2 Random )
+{
+	float E1 = frac( (float)Index / NumSamples + float( Random.x ) * (1.0 / 65536.0) );
+	float E2 = float( ( reversebits(Index) >> 16 ) ^ Random.y ) * (1.0 / 65536.0);
+	return float2( E1, E2 );
+}
 
 SReservoir LoadReservoir(
     uint2 reservoir_coord, 
