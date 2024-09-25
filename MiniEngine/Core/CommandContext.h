@@ -303,6 +303,7 @@ public:
     void DispatchIndirect( GpuBuffer& ArgumentBuffer, uint64_t ArgumentBufferOffset = 0 );
     void ExecuteIndirect(CommandSignature& CommandSig, GpuBuffer& ArgumentBuffer, uint64_t ArgumentStartOffset = 0,
         uint32_t MaxCommands = 1, GpuBuffer* CommandCounterBuffer = nullptr, uint64_t CounterOffset = 0);
+    void RayTracingCommitDescTable();
 
 private:
 };
@@ -727,6 +728,11 @@ inline void ComputeContext::ExecuteIndirect(CommandSignature& CommandSig,
     m_CommandList->ExecuteIndirect(CommandSig.GetSignature(), MaxCommands,
         ArgumentBuffer.GetResource(), ArgumentStartOffset,
         CommandCounterBuffer == nullptr ? nullptr : CommandCounterBuffer->GetResource(), CounterOffset);
+}
+
+inline void ComputeContext::RayTracingCommitDescTable()
+{
+    m_DynamicViewDescriptorHeap.CommitComputeRootDescriptorTables(m_CommandList);
 }
 
 inline void ComputeContext::DispatchIndirect( GpuBuffer& ArgumentBuffer, uint64_t ArgumentBufferOffset )

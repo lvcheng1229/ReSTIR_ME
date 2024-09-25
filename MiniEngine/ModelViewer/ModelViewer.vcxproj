@@ -57,10 +57,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="RestirGBufferGen.cpp" />
-    <ClCompile Include="RestirGlobalResource.cpp" />
     <ClCompile Include="RestirME.cpp" />
-    <ClCompile Include="ShaderCompile.cpp" />
+    <ClCompile Include="Restir\RestirGBufferGen.cpp" />
+    <ClCompile Include="Restir\RestirGlobalResource.cpp" />
+    <ClCompile Include="Restir\RestirRayTracer.cpp" />
+    <ClCompile Include="Restir\RestirRayTracerBackEnd.cpp" />
+    <ClCompile Include="Restir\ShaderCompile.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Core/Core.vcxproj">
@@ -357,10 +359,12 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="RestirCommon.h" />
-    <ClInclude Include="RestirGBufferGen.h" />
-    <ClInclude Include="RestirGlobalResource.h" />
-    <ClInclude Include="ShaderCompile.h" />
+    <ClInclude Include="Restir\DXSampleHelper.h" />
+    <ClInclude Include="Restir\RestirCommon.h" />
+    <ClInclude Include="Restir\RestirGBufferGen.h" />
+    <ClInclude Include="Restir\RestirGlobalResource.h" />
+    <ClInclude Include="Restir\RestirRayTracer.h" />
+    <ClInclude Include="Restir\ShaderCompile.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ItemDefinitionGroup>

@@ -1,14 +1,17 @@
-cbuffer VSConstants : register(b0)
+cbuffer MeshConstants : register(b0)
 {
-    float4x4 modelToProjection;
-    float4x4 modelToShadow;
-    float3 ViewerPos;
+    float4x4 WorldMatrix;   // Object to world
+    float3x3 WorldIT;       // Object normal to world normal
 };
 
-cbuffer StartVertex : register(b1)
+cbuffer GlobalConstants : register(b1)
 {
-    uint materialIdx;
-};
+    float4x4 ViewProjMatrix;
+    float4x4 SunShadowMatrix;
+    float3 ViewerPos;
+    float3 SunDirection;
+    float3 SunIntensity;
+}
 
 struct VSInput
 {
@@ -35,13 +38,14 @@ VSOutput main(VSInput vsInput, uint vertexID : SV_VertexID)
 {
     VSOutput vsOutput;
 
-    vsOutput.position = mul(modelToProjection, float4(vsInput.position, 1.0));
-    vsOutput.worldPos = vsInput.position;
-    vsOutput.texCoord = vsInput.texcoord0;
-    vsOutput.viewDir = vsInput.position - ViewerPos;
-    vsOutput.shadowCoord = mul(modelToShadow, float4(vsInput.position, 1.0)).xyz;
+    float4 position = float4(vsInput.position, 1.0);
+    float3 normal = vsInput.normal * 2 - 1;
 
-    vsOutput.normal = vsInput.normal;
+    vsOutput.worldPos = mul(WorldMatrix, position).xyz;
+    vsOutput.position = mul(ViewProjMatrix, float4(vsOutput.worldPos, 1.0));
+    vsOutput.shadowCoord = mul(SunShadowMatrix, float4(vsOutput.worldPos, 1.0)).xyz;
+    vsOutput.normal = mul(WorldIT, normal);
+    vsOutput.texCoord = vsInput.texcoord0;
     vsOutput.tangent = vsInput.tangent;
     vsOutput.bitangent = vsInput.bitangent;
 

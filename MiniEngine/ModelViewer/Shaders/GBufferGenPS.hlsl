@@ -10,22 +10,23 @@ struct VSOutput
 	float3 bitangent : Bitangent;
 };
 
-struct OutGBuffer
+struct SOutGBuffer
 {
 	float4 gbufferA : SV_Target0;
 	float4 gbufferB : SV_Target1;
 };
 
-Texture2D<float3> texNormal					: register(t3);
+Texture2D<float3> texNormal					: register(t4);
 SamplerState defaultTextureSampler       	: register(s0);
 
-OutGBuffer main(VSOutput vsOutput)
+SOutGBuffer main(VSOutput vsOutput)
 {
-    OutGBuffer gbufferData = (OutGBuffer)0;
-    float3 texNormalValue = texNormal.Sample(defaultTextureSampler, vsOutput.uv);
+    SOutGBuffer gbufferData = (SOutGBuffer)0;
+    //float3 texNormalValue = texNormal.Sample(defaultTextureSampler, vsOutput.uv);
+    float3 texNormalValue = float3(0,0,1);
     float3x3 tbn = float3x3(normalize(vsOutput.tangent), normalize(vsOutput.bitangent), normalize(vsOutput.normal));
     float3 worldNormal = normalize(mul(texNormalValue, tbn));
-    float roughness = ;
+    float roughness = 1.0;
 	
 	gbufferData.gbufferA = float4(worldNormal, 1.0);
 	gbufferData.gbufferB = float4(vsOutput.worldPos,roughness);

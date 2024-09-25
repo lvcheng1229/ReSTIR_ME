@@ -1,7 +1,6 @@
-#include "RestirGBufferGen.h"
-#include "RestirGlobalResource.h"
-
-#define LEGACY_RENDERER
+#include "Restir/RestirGBufferGen.h"
+#include "Restir/RestirGlobalResource.h"
+#include "Restir/RestirRayTracer.h"
 
 using namespace GameCore;
 using namespace Math;
@@ -32,7 +31,7 @@ private:
 
     ModelInstance m_ModelInst;
     ShadowCamera m_SunShadowCamera;
-
+    CRestirRayTracer restirRayTracer;
     CGBufferGenPass m_GBufferGenPass;
 };
 
@@ -139,8 +138,11 @@ void RestirApp::Startup( void )
     if (CommandLineArgs::GetString(L"model", gltfFileName) == false)
     {
 #ifdef LEGACY_RENDERER
-        Sponza::Startup(m_Camera);
+        //Sponza::Startup(m_Camera);
 #else
+        // workaround
+        Sponza::Startup(m_Camera);
+
         m_ModelInst = Renderer::LoadModel(L"Sponza/PBR/sponza2.gltf", forceRebuild);
         m_ModelInst.Resize(100.0f * m_ModelInst.GetRadius());
         OrientedBox obb = m_ModelInst.GetBoundingBox();
@@ -163,6 +165,9 @@ void RestirApp::Startup( void )
         m_CameraController.reset(new FlyingFPSCamera(m_Camera, Vector3(kYUnitVector)));
     else
         m_CameraController.reset(new OrbitCamera(m_Camera, m_ModelInst.GetBoundingSphere(), Vector3(kYUnitVector)));
+
+    GetGlobalResource().pModelInst = &m_ModelInst;
+    restirRayTracer.Init();
 }
 
 void RestirApp::Cleanup( void )
@@ -171,9 +176,9 @@ void RestirApp::Cleanup( void )
 
     g_IBLTextures.clear();
 
-#ifdef LEGACY_RENDERER
+//#ifdef LEGACY_RENDERER
     Sponza::Cleanup();
-#endif
+//#endif
 
     Renderer::Shutdown();
 }
@@ -209,6 +214,8 @@ void RestirApp::Update( float deltaT )
     m_MainScissor.top = 0;
     m_MainScissor.right = (LONG)g_SceneColorBuffer.GetWidth();
     m_MainScissor.bottom = (LONG)g_SceneColorBuffer.GetHeight();
+
+   
 }
 
 void RestirApp::RenderScene( void )
@@ -239,6 +246,12 @@ void RestirApp::RenderScene( void )
         //m_SunShadowCamera.UpdateMatrix(-SunDirection, m_ModelInst.GetCenter(), ShadowBounds,
         m_SunShadowCamera.UpdateMatrix(-SunDirection, Vector3(0, -500.0f, 0), Vector3(5000, 3000, 3000),
             (uint32_t)g_ShadowBuffer.GetWidth(), (uint32_t)g_ShadowBuffer.GetHeight(), 16);
+
+        {
+            GetGlobalResource().restirSceneInfo.lightDirection = DirectX::XMFLOAT3(SunDirection.GetX(), SunDirection.GetY(), SunDirection.GetZ()) ;
+            GetGlobalResource().restirSceneInfo.fullScreenTextureSize = DirectX::XMFLOAT4(g_SceneGBufferA.GetWidth(), g_SceneGBufferA.GetHeight(), 1.0 / g_SceneGBufferA.GetWidth(), 1.0 / g_SceneGBufferA.GetHeight());
+            GetGlobalResource().restirSceneInfo.restirTextureSize = DirectX::XMFLOAT4(g_ReservoirRayDirection.GetWidth(), g_ReservoirRayDirection.GetHeight(), 1.0 / g_ReservoirRayDirection.GetWidth(), 1.0 / g_ReservoirRayDirection.GetHeight());
+        }
 
         GlobalConstants globals;
         globals.ViewProjMatrix = m_Camera.GetViewProjMatrix();
@@ -285,13 +298,23 @@ void RestirApp::RenderScene( void )
                 shadowSorter.RenderMeshes(MeshSorter::kZPass, gfxContext, globals);
             }
 
+            // generate gbuffer
             {
                 MeshSorter gBufferGenwSorter(MeshSorter::kRestirGBuffer);
                 gBufferGenwSorter.SetCamera(m_Camera);
+                gBufferGenwSorter.SetViewport(viewport);
+                gBufferGenwSorter.SetScissor(scissor);
                 m_ModelInst.Render(gBufferGenwSorter);
                 gBufferGenwSorter.Sort();
+                
+                globals.ViewProjMatrix = m_Camera.GetViewProjMatrix();
+                globals.CameraPos = m_Camera.GetPosition();
 
-                //m_GBufferGenPass.GenerateGBuffer(gfxContext, globals, gBufferGenwSorter.GetSortObject());
+                m_GBufferGenPass.GenerateGBuffer(gfxContext, globals, gBufferGenwSorter.GetSortObject());
+            }
+
+            {
+                restirRayTracer.GenerateInitialSampling(gfxContext);
             }
 
             gfxContext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);

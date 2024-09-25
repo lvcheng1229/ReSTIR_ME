@@ -12,6 +12,9 @@
     <Filter Include="Shaders">
       <UniqueIdentifier>{17157387-93c6-4153-83e6-c1abfd6fb95b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Restir">
+      <UniqueIdentifier>{12001053-0fd1-45e1-9874-238bce631b19}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="Textures\Atrium_diffuseIBL.dds">
@@ -229,31 +232,43 @@
     <ClCompile Include="RestirME.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RestirGBufferGen.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="Restir\RestirGBufferGen.cpp">
+      <Filter>Restir</Filter>
     </ClCompile>
-    <ClCompile Include="ShaderCompile.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="Restir\RestirGlobalResource.cpp">
+      <Filter>Restir</Filter>
     </ClCompile>
-    <ClCompile Include="RestirGlobalResource.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="Restir\ShaderCompile.cpp">
+      <Filter>Restir</Filter>
+    </ClCompile>
+    <ClCompile Include="Restir\RestirRayTracer.cpp">
+      <Filter>Restir</Filter>
+    </ClCompile>
+    <ClCompile Include="Restir\RestirRayTracerBackEnd.cpp">
+      <Filter>Restir</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="RestirGBufferGen.h">
-      <Filter>Source Files</Filter>
+    <ClInclude Include="Restir\RestirCommon.h">
+      <Filter>Restir</Filter>
     </ClInclude>
-    <ClInclude Include="RestirCommon.h">
-      <Filter>Source Files</Filter>
+    <ClInclude Include="Restir\RestirGBufferGen.h">
+      <Filter>Restir</Filter>
     </ClInclude>
-    <ClInclude Include="ShaderCompile.h">
-      <Filter>Source Files</Filter>
+    <ClInclude Include="Restir\RestirGlobalResource.h">
+      <Filter>Restir</Filter>
     </ClInclude>
-    <ClInclude Include="RestirGlobalResource.h">
-      <Filter>Source Files</Filter>
+    <ClInclude Include="Restir\ShaderCompile.h">
+      <Filter>Restir</Filter>
+    </ClInclude>
+    <ClInclude Include="Restir\RestirRayTracer.h">
+      <Filter>Restir</Filter>
+    </ClInclude>
+    <ClInclude Include="Restir\DXSampleHelper.h">
+      <Filter>Restir</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -9,7 +9,7 @@ struct SMeshGpuData
     uint ibIndex;
     uint vbIndex;
     uint vbStride;
-    uint uvOffset
+    uint uvOffset;
     uint albedoIndex; // fully rough surface
 };
 
@@ -111,8 +111,11 @@ void InitialSamplingRayGen()
     uint2 reservoir_coord = DispatchRaysIndex().xy;
     if(reservoir_coord.x < g_restir_texturesize.x && reservoir_coord.y < g_restir_texturesize.y)
     {
-        float3 world_position = gbuffer_b.Load(int3(reservoir_coord.xy,0)).xyz;
-        float world_normal = gbuffer_a.Load(int3(reservoir_coord.xy,0)).xyz;
+        float2 reservpor_uv = float2(reservoir_coord.xy) / float2(g_restir_texturesize.xy);
+        uint2 gbuffer_pos = (reservpor_uv + float2(0.5,0.5)) * g_full_screen_texsize.xy;
+
+        float3 world_position = gbuffer_b.Load(int3(gbuffer_pos.xy,0)).xyz;
+        float world_normal = gbuffer_a.Load(int3(gbuffer_pos.xy,0)).xyz;
 
         // https://developer.nvidia.com/blog/rendering-in-real-time-with-spatiotemporal-blue-noise-textures-part-2/
         float2 E = GetBlueNoiseVector2(reservoir_coord, g_current_frame_index):
