@@ -1,25 +1,26 @@
 
 #define GROUP_SIZE 16
 
-Texture3D<float> stbn_scalar_tex: register(t7);
+
 
 #include "ReSTIRCommon.hlsl"
 
 // ping-pong pass, texture resources are from the temporal resampling
 Texture2D<float4> reservoir_ray_direction : register(t0);
-Texture2D<float3> reservoir_ray_radiance : register(t1);
+Texture2D<float4> reservoir_ray_radiance : register(t1); //xyz only
 Texture2D<float>  reservoir_hit_distance : register(t2);
-Texture2D<float3> reservoir_hit_normal : register(t3);
-Texture2D<float3> reservoir_weights : register(t4);
+Texture2D<float4> reservoir_hit_normal : register(t3);//xyz only
+Texture2D<float4> reservoir_weights : register(t4);//xyz only
 
-Texture2D<float3> downsampled_world_pos : register(t5);
-Texture2D<float3> downsampled_world_normal : register(t6);
+Texture2D<float4> downsampled_world_pos : register(t5); //xyz only
+Texture2D<float4> downsampled_world_normal : register(t6); //xyz only
+Texture3D<float> stbn_scalar_tex: register(t7);
 
 RWTexture2D<float4> rw_reservoir_ray_direction : register(u0);
-RWTexture2D<float3> rw_reservoir_ray_radiance : register(u1);
+RWTexture2D<float4> rw_reservoir_ray_radiance : register(u1);//xyz only
 RWTexture2D<float>  rw_reservoir_hit_distance : register(u2);
-RWTexture2D<float3> rw_reservoir_hit_normal : register(u3);
-RWTexture2D<float3> rw_reservoir_weights : register(u4);
+RWTexture2D<float4> rw_reservoir_hit_normal : register(u3);//xyz only
+RWTexture2D<float4> rw_reservoir_weights : register(u4);//xyz only
 
 cbuffer CBRestirSceneInfo : register(b0)
 {
@@ -56,13 +57,13 @@ float CalculateJacobian(float3 world_position, float3 neighbor_world_position, S
 void SpatialResamplingCS(uint2 dispatch_thread_id : SV_DispatchThreadID)
 {
     uint2 reservoir_coord = dispatch_thread_id.xy;
-    float3 world_position = downsampled_world_pos[reservoir_coord];
+    float3 world_position = downsampled_world_pos[reservoir_coord].xyz;
     if(all(reservoir_coord < g_restir_texturesize) && any(world_position != float3(0,0,0)))
     {
         SReservoir current_reservoir = LoadReservoir(reservoir_coord, reservoir_ray_direction, reservoir_ray_radiance, reservoir_hit_distance, reservoir_hit_normal, reservoir_weights);
 
-        float3 world_normal = downsampled_world_normal[reservoir_coord];
-        float noise = GetBlueNoiseScalar(reservoir_coord, g_current_frame_index);
+        float3 world_normal = downsampled_world_normal[reservoir_coord].xyz;
+        float noise = GetBlueNoiseScalar(stbn_scalar_tex, reservoir_coord, g_current_frame_index);
 
         const int num_spatial_samples = 4;
         const float spatial_resampling_kernel_radius = 0.05;
@@ -77,18 +78,18 @@ void SpatialResamplingCS(uint2 dispatch_thread_id : SV_DispatchThreadID)
 
             int2 neighbor_reservoir_coord = clamp(reservoir_offset_int + reservoir_coord, int2(0,0), int2(g_restir_texturesize.xy) - int2(1,1));
 
-            float3 neighbor_world_position = downsampled_world_pos[neighbor_reservoir_coord];
+            float3 neighbor_world_position = downsampled_world_pos[neighbor_reservoir_coord].xyz;
             if(any(neighbor_world_position != float3(0,0,0)))
             {
                 SReservoir neighbor_reservoir = LoadReservoir(neighbor_reservoir_coord, reservoir_ray_direction, reservoir_ray_radiance, reservoir_hit_distance, reservoir_hit_normal, reservoir_weights);
 
-                float3 neighbor_world_normal = downsampled_world_normal[neighbor_reservoir_coord];
+                float3 neighbor_world_normal = downsampled_world_normal[neighbor_reservoir_coord].xyz;
 
                 bool is_history_nearby = (distance(neighbor_world_position, world_position) < 10.0f) && (abs(dot(neighbor_world_normal,world_normal) < 0.25));
                 if(is_history_nearby)
                 {
                     float jacobian = CalculateJacobian(world_position, neighbor_world_position, neighbor_reservoir);
-                    float swap_noise = GetBlueNoiseScalar(reservoir_coord, g_current_frame_index * num_spatial_samples + sample_index);
+                    float swap_noise = GetBlueNoiseScalar(stbn_scalar_tex, reservoir_coord, g_current_frame_index * num_spatial_samples + sample_index);
                     MergeReservoirSample(current_reservoir, neighbor_reservoir, neighbor_reservoir.m_sample.pdf * jacobian, swap_noise);
                 }
             }

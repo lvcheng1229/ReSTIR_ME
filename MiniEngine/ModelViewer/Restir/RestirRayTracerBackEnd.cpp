@@ -448,7 +448,7 @@ void CRestirRayTracer::CreateRTPipelineStateAndShaderTable()
    uint32_t hitProgramIndex = 0;
    uint32_t subObjectsIndex = 0;
    
-   std::shared_ptr<SCompiledShaderCode> rayTracingShaderCode = GetGlobalResource().m_ShaderCompiler.Compile(shaderPath, L"", L"lib_6_3", nullptr, 0);
+   std::shared_ptr<SCompiledShaderCode> rayTracingShaderCode = GetGlobalResource().m_ShaderCompilerDxc.Compile(shaderPath, L"", L"lib_6_3", nullptr, 0);
     SDxilLibrary dxilLib(rayTracingShaderCode, pEntryPoint.data(), pEntryPoint.size());
     stateSubObjects[subObjectsIndex] = dxilLib.m_stateSubobject;
     subObjectsIndex++;

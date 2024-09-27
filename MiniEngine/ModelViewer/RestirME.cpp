@@ -5,6 +5,7 @@
 #include "Restir/RestirGlobalResource.h"
 #include "Restir/RestirRayTracer.h"
 #include "Restir/RestirResampling.h"
+#include "Restir/RestirIntegrateAndDenoise.h"
 
 #if ENABLE_PIX_FRAME_CAPTURE
 #if !PIX_CAPUTRE_LOAD_FROM_DLL
@@ -110,7 +111,9 @@ private:
     CRestirRayTracer restirRayTracer;
     CGBufferGenPass m_GBufferGenPass;
     CRestirResamplingPass restirResamplingPass;
+    CRestirIntegrateAndDenoise integrateAndDenoise;
 
+    Math::Matrix4 pre_view_matrix;
 #if ENABLE_PIX_FRAME_CAPTURE
     HMODULE m_pixModule;
 #endif
@@ -262,6 +265,7 @@ void RestirApp::Startup( void )
 
     GetGlobalResource().pModelInst = &m_ModelInst;
     restirRayTracer.Init();
+    restirResamplingPass.Init();
 }
 
 void RestirApp::Cleanup( void )
@@ -286,6 +290,8 @@ void RestirApp::Update( float deltaT )
 {
     ScopedTimer _prof(L"Update State");
 
+    GetGlobalResource().currentFrameIndex++;
+    
     if (GameInput::IsFirstPressed(GameInput::kLShoulder))
         DebugZoom.Decrement();
     else if (GameInput::IsFirstPressed(GameInput::kRShoulder))
@@ -369,9 +375,19 @@ void RestirApp::RenderScene( void )
             (uint32_t)g_ShadowBuffer.GetWidth(), (uint32_t)g_ShadowBuffer.GetHeight(), 16);
 
         {
-            GetGlobalResource().restirSceneInfo.lightDirection = DirectX::XMFLOAT3(SunDirection.GetX(), SunDirection.GetY(), SunDirection.GetZ()) ;
-            GetGlobalResource().restirSceneInfo.fullScreenTextureSize = DirectX::XMFLOAT4(g_SceneGBufferA.GetWidth(), g_SceneGBufferA.GetHeight(), 1.0 / g_SceneGBufferA.GetWidth(), 1.0 / g_SceneGBufferA.GetHeight());
-            GetGlobalResource().restirSceneInfo.restirTextureSize = DirectX::XMFLOAT4(g_ReservoirRayDirection.GetWidth(), g_ReservoirRayDirection.GetHeight(), 1.0 / g_ReservoirRayDirection.GetWidth(), 1.0 / g_ReservoirRayDirection.GetHeight());
+            GetGlobalResource().restirSceneInfoTemp.lightDirection = DirectX::XMFLOAT3(SunDirection.GetX(), SunDirection.GetY(), SunDirection.GetZ()) ;
+            GetGlobalResource().restirSceneInfoTemp.fullScreenTextureSize = DirectX::XMFLOAT4(g_SceneGBufferA.GetWidth(), g_SceneGBufferA.GetHeight(), 1.0 / g_SceneGBufferA.GetWidth(), 1.0 / g_SceneGBufferA.GetHeight());
+            GetGlobalResource().restirSceneInfoTemp.restirTextureSize = DirectX::XMFLOAT4(g_ReservoirRayDirection[0].GetWidth(), g_ReservoirRayDirection[0].GetHeight(), 1.0 / g_ReservoirRayDirection[0].GetWidth(), 1.0 / g_ReservoirRayDirection[0].GetHeight());
+
+            GetGlobalResource().restirSceneInfo.PreViewProjMatrix = pre_view_matrix;
+            GetGlobalResource().restirSceneInfo.g_restir_texturesize = DirectX::XMFLOAT2(g_ReservoirRayDirection[0].GetWidth(), g_ReservoirRayDirection[0].GetHeight());
+            GetGlobalResource().restirSceneInfo.g_full_screen_texsize = DirectX::XMFLOAT2(g_SceneGBufferA.GetWidth(), g_SceneGBufferA.GetHeight());
+            GetGlobalResource().restirSceneInfo.g_sun_direction = DirectX::XMFLOAT3(SunDirection.GetX(), SunDirection.GetY(), SunDirection.GetZ());
+            GetGlobalResource().restirSceneInfo.g_current_frame_index++;
+            GetGlobalResource().restirSceneInfo.g_sun_intensity = DirectX::XMFLOAT3(10.0f, 10.0f, 10.0f);
+            GetGlobalResource().restirSceneInfo.g_camera_worldpos = DirectX::XMFLOAT3(m_Camera.GetPosition().GetX(), m_Camera.GetPosition().GetY(), m_Camera.GetPosition().GetZ());
+
+            pre_view_matrix = m_Camera.GetViewProjMatrix();
         }
 
         GlobalConstants globals;

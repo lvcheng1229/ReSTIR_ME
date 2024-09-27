@@ -1,14 +1,17 @@
 #ifndef _RESTIR_COMMON_
 #define _RESTIR_COMMON_
+#define PI 3.14159265358979
 
 #define RESTIR_SCENE_INFO_COMMON\
     float4x4 PreViewProjMatrix;\
     float2 g_restir_texturesize;\
-    uint g_current_frame_index;\
-    float3 g_sun_direction;\
-    float3 g_sun_intensity;\
     float2 g_full_screen_texsize;\
+    float3 g_sun_direction;\
+    uint g_current_frame_index;\
+    float3 g_sun_intensity;\
+    float restirpadding0;\
     float3 g_camera_worldpos;\
+    float restirpadding1;\
 
 
 #define DISOCCLUSION_VARIANCE 1.0
@@ -40,35 +43,35 @@ void InitializeReservoir(inout SReservoir reservoir)
 bool UpdateReservoir(inout SReservoir reservoir, SSample new_sample, float weight_new, float noise)
 {
     bool is_sample_changed = false;
-    weight_sum += weight_new;
-    num_sample += 1.0f;
+    reservoir.weight_sum += weight_new;
+    reservoir.comb_weight += 1.0f;
 
-    if (noise < weight_new / weight_sum)
+    if (noise < weight_new / reservoir.weight_sum)
 	{
-		m_sample = new_sample;
+		reservoir.m_sample = new_sample;
 		is_sample_changed = true;
 	}
     return is_sample_changed;
 }
 
-void MergeReservoirSample(inout SReservoir reservoir_sample, SReservoir new_reservoir_sample, float other_sample_pdf, float noise)
+bool MergeReservoirSample(inout SReservoir reservoir_sample, SReservoir new_reservoir_sample, float other_sample_pdf, float noise)
 {
     float M0 = reservoir_sample.M;
-    bool is_changed = UpdateReservoir(reservoir_sample, new_reservoir_sample, other_sample_pdf * new_reservoir_sample.M * new_reservoir_sample.comb_weight, noise);
+    bool is_changed = UpdateReservoir(reservoir_sample, new_reservoir_sample.m_sample, other_sample_pdf * new_reservoir_sample.M * new_reservoir_sample.comb_weight, noise);
     reservoir_sample.M = M0 + new_reservoir_sample.M;
     return is_changed;
 }
 
-float2 GetBlueNoiseVector2(uint2 screen_position,uint frame_index)
+float2 GetBlueNoiseVector2(Texture3D<float2> stbn_vec2_tex, uint2 screen_position,uint frame_index)
 {
     uint3 texture_coord_3d = uint3(screen_position.xy, frame_index) & uint3(128,128,64);
-    return stbn_vec2_tex.Load(texture_coord_3d.xyz,0).xy;
+    return stbn_vec2_tex.Load(int4(texture_coord_3d.xyz,0)).xy;
 }
 
-float GetBlueNoiseScalar(uint2 screen_position,uint frame_index)
+float GetBlueNoiseScalar(Texture3D<float> stbn_scalar_tex,uint2 screen_position,uint frame_index)
 {
     uint3 texture_coord_3d = uint3(screen_position.xy, frame_index) & uint3(128,128,64);
-    return stbn_scalar_tex.Load(texture_coord_3d.xyz,0).x;
+    return stbn_scalar_tex.Load(int4(texture_coord_3d.xyz,0)).x;
 }
 
 //From UnrealEngine
@@ -87,7 +90,7 @@ float Luma(float3 color)
 
 float3 ToneMappingLighting(float3 light)
 {
-    return light / (1 + Luma(light))
+    return light / (1 + Luma(light));
 }
 
 float3 InverseToneMappingLight(float3 light)
@@ -123,17 +126,17 @@ float2 Hammersley16( uint Index, uint NumSamples, uint2 Random )
 SReservoir LoadReservoir(
     uint2 reservoir_coord, 
     Texture2D<float4> reservoir_ray_direction,
-    Texture2D<float3> reservoir_ray_radiance,
+    Texture2D<float4> reservoir_ray_radiance,
     Texture2D<float> reservoir_hit_distance,
-    Texture2D<float3> reservoir_hit_normal,
-    Texture2D<float3> reservoir_weights
+    Texture2D<float4> reservoir_hit_normal,
+    Texture2D<float4> reservoir_weights
     )
 {
     SSample reservoir_sample;
     reservoir_sample.ray_direction = reservoir_ray_direction[reservoir_coord].xyz;
-    reservoir_sample.radiance = reservoir_ray_radiance[reservoir_coord];
+    reservoir_sample.radiance = reservoir_ray_radiance[reservoir_coord].xyz;
     reservoir_sample.hit_distance = reservoir_hit_distance[reservoir_coord];
-    reservoir_sample.hit_normal = reservoir_hit_normal[reservoir_coord];
+    reservoir_sample.hit_normal = reservoir_hit_normal[reservoir_coord].xyz;
     reservoir_sample.pdf = reservoir_ray_direction[reservoir_coord].w;
 
     SReservoir reservoir;
@@ -141,22 +144,24 @@ SReservoir LoadReservoir(
     reservoir.weight_sum = reservoir_weights[reservoir_coord].x;
     reservoir.M = reservoir_weights[reservoir_coord].y;
     reservoir.comb_weight = reservoir_weights[reservoir_coord].z;
+    return reservoir;
 }
 
-SReservoir StoreReservoir(
+void StoreReservoir(
     uint2 reservoir_coord, 
     SReservoir reservoir, 
     RWTexture2D<float4> reservoir_ray_direction,
-    RWTexture2D<float3> reservoir_ray_radiance,
+    RWTexture2D<float4> reservoir_ray_radiance,
     RWTexture2D<float> reservoir_hit_distance,
-    RWTexture2D<float3> reservoir_hit_normal,
-    RWTexture2D<float3> reservoir_weights)
+    RWTexture2D<float4> reservoir_hit_normal,
+    RWTexture2D<float4> reservoir_weights)
 {
+    SSample reservoir_sample = reservoir.m_sample;
     reservoir_ray_direction[reservoir_coord] = float4(reservoir.m_sample.ray_direction, reservoir.m_sample.pdf);
-    reservoir_ray_radiance[reservoir_coord] = float3(reservoir_sample.radiance);
+    reservoir_ray_radiance[reservoir_coord] = float4(reservoir_sample.radiance,1.0);
     reservoir_hit_distance[reservoir_coord] = reservoir_sample.hit_distance;
-    reservoir_hit_normal[reservoir_coord] = reservoir_sample.hit_normal;
+    reservoir_hit_normal[reservoir_coord] = float4(reservoir_sample.hit_normal,1.0);
 
-    reservoir_weights[reservoir_coord] = float3(reservoir.weight_sum, reservoir.M, reservoir.comb_weight);
+    reservoir_weights[reservoir_coord] = float4(reservoir.weight_sum, reservoir.M, reservoir.comb_weight,1.0);
 }
 #endif

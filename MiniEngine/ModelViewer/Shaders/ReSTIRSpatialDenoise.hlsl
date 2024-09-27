@@ -1,14 +1,19 @@
 #define GROUP_SIZE 16
 #include "ReSTIRCommon.hlsl"
 
-Texture2D<float3> input_diffuse_indirect : register(t0);
-Texture2D<float3> input_specular_indirect : register(t1);
+Texture2D<float4> input_diffuse_indirect : register(t0);//xyz only
+Texture2D<float4> input_specular_indirect : register(t1);//xyz only
 
-Texture2D<float4> gbuffer_world_pos : register(t5);
-Texture2D<float4> gbuffer_world_normal : register(t5); // xyz, world normal, w roughness
+Texture2D<float4> gbuffer_world_pos : register(t2);
+Texture2D<float4> gbuffer_world_normal : register(t3); // xyz, world normal, w roughness
 
-RWTexture2D<float3> output_diffuse_indirect : register(u0);
-RWTexture2D<float3> output_specular_indirect : register(u1);
+RWTexture2D<float4> output_diffuse_indirect : register(u0);//xyz only
+RWTexture2D<float4> output_specular_indirect : register(u1);//xyz only
+
+cbuffer CBRestirSceneInfo : register(b0)
+{
+    RESTIR_SCENE_INFO_COMMON
+};
 
 
 [numthreads(GROUP_SIZE, GROUP_SIZE, 1)]
@@ -24,8 +29,8 @@ void ReSTIRSpatialDenoiseCS(uint2 dispatch_thread_id : SV_DispatchThreadID)
         float3 world_position = gbuffer_world_pos[current_pixel_pos].xyz;
         if(any(world_position != float3(0,0,0)))
         {
-            filtered_diffuse_indirect = ToneMappingLighting(input_diffuse_indirect[current_pixel_pos]);
-            filtered_specular_indirect = ToneMappingLighting(input_specular_indirect[current_pixel_pos]);
+            filtered_diffuse_indirect = ToneMappingLighting(input_diffuse_indirect[current_pixel_pos].xyz);
+            filtered_specular_indirect = ToneMappingLighting(input_specular_indirect[current_pixel_pos].xyz);
 
             float3 world_normal = gbuffer_world_normal[current_pixel_pos].xyz;
             float4 current_sample_scene_plane = float4(world_normal, dot(world_position, world_normal));
@@ -60,8 +65,8 @@ void ReSTIRSpatialDenoiseCS(uint2 dispatch_thread_id : SV_DispatchThreadID)
                         float normal_weight = 1.0 - saturate(angle_between_normal * angle_between_normal);
 
                         float sample_weight = spatial_weight * depth_weight * normal_weight;
-                        filtered_diffuse_indirect += ToneMappingLighting(input_diffuse_indirect[neighbor_position]) * sample_weight;
-                        filtered_specular_indirect += ToneMappingLighting(input_specular_indirect[neighbor_position]) * sample_weight;
+                        filtered_diffuse_indirect += ToneMappingLighting(input_diffuse_indirect[neighbor_position].xyz) * sample_weight;
+                        filtered_specular_indirect += ToneMappingLighting(input_specular_indirect[neighbor_position].xyz) * sample_weight;
                         total_weight += sample_weight;
                     }
                 }
@@ -70,11 +75,11 @@ void ReSTIRSpatialDenoiseCS(uint2 dispatch_thread_id : SV_DispatchThreadID)
             filtered_diffuse_indirect = filtered_diffuse_indirect / total_weight;
             filtered_specular_indirect = filtered_specular_indirect / total_weight;
 
-            output_diffuse_indirect[current_pixel_pos] = InverseToneMappingLight(filtered_diffuse_indirect);
-        output_specular_indirect[current_pixel_pos] = InverseToneMappingLight(filtered_specular_indirect);
+            output_diffuse_indirect[current_pixel_pos] = float4(InverseToneMappingLight(filtered_diffuse_indirect),1.0);
+            output_specular_indirect[current_pixel_pos] = float4(InverseToneMappingLight(filtered_specular_indirect),1.0);
         }
     }
 
-    output_diffuse_indirect[current_pixel_pos] = filtered_diffuse_indirect;
-    output_specular_indirect[current_pixel_pos] = filtered_specular_indirect;
+    output_diffuse_indirect[current_pixel_pos] = float4(filtered_diffuse_indirect,1.0);
+    output_specular_indirect[current_pixel_pos] = float4(filtered_specular_indirect,1.0);
 }

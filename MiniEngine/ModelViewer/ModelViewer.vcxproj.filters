@@ -250,6 +250,9 @@
     <ClCompile Include="Restir\RestirResampling.cpp">
       <Filter>Restir</Filter>
     </ClCompile>
+    <ClCompile Include="Restir\RestirIntegrateAndDenoise.cpp">
+      <Filter>Restir</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -274,6 +277,9 @@
       <Filter>Restir</Filter>
     </ClInclude>
     <ClInclude Include="Restir\RestirResampling.h">
+      <Filter>Restir</Filter>
+    </ClInclude>
+    <ClInclude Include="Restir\RestirIntegrateAndDenoise.h">
       <Filter>Restir</Filter>
     </ClInclude>
   </ItemGroup>

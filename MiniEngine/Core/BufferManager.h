@@ -31,7 +31,17 @@ namespace Graphics
     extern ColorBuffer g_SceneGBufferA;     // R16G16B16A16_FLOAT normal
     extern ColorBuffer g_SceneGBufferB;     // R16G16B16A16_FLOAT world position todo
 
-    extern ColorBuffer g_ReservoirRayDirection; // R16G16B16A16_FLOAT
+    // 0: History Buffer; 1: Current Buffer(Before Resampling) 2: Current Buffer(After Resampling) 
+    extern ColorBuffer g_ReservoirRayDirection[3]; // R16G16B16A16_FLOAT Half Res
+    extern ColorBuffer g_ReservoirRayRadiance[3];  // R16G16B16_FLOAT Half Res
+    extern ColorBuffer g_ReservoirRayDistance[3];  // R16_FLOAT Half Res
+    extern ColorBuffer g_ReservoirRayNormal[3];    // R16G16B16_FLOAT Half Res
+    extern ColorBuffer g_ReservoirRayWeights[3];    // R16G16B16_FLOAT Half Res
+    extern ColorBuffer g_DownSampledWorldPosition[3];    // R16G16B16_FLOAT Half Res
+    extern ColorBuffer g_DownSampledWorldNormal[3];    // R16G16B16_FLOAT Half Res
+
+    extern ColorBuffer g_RestirDiffuseIndirect[2];    // R16G16B16_FLOAT Half Res
+    extern ColorBuffer g_RestirSpecularIndirect[2];    // R16G16B16_FLOAT Half Res
 
     extern ColorBuffer g_VelocityBuffer;    // R10G10B10  (3D velocity)
     extern ShadowBuffer g_ShadowBuffer;

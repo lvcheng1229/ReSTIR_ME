@@ -30,8 +30,8 @@ void CGBufferGenPass::Init()
 
     // PSO
     {
-        std::shared_ptr<SCompiledShaderCode> pVsShaderCode = GetGlobalResource().m_ShaderCompiler.Compile(L"Shaders/GBufferGenVS.hlsl", L"main", L"vs_6_5", nullptr, 0);
-        std::shared_ptr<SCompiledShaderCode> pPsShaderCode = GetGlobalResource().m_ShaderCompiler.Compile(L"Shaders/GBufferGenPS.hlsl", L"main", L"ps_6_5", nullptr, 0);
+        std::shared_ptr<SCompiledShaderCode> pVsShaderCode = GetGlobalResource().m_ShaderCompilerDxc.Compile(L"Shaders/GBufferGenVS.hlsl", L"main", L"vs_6_5", nullptr, 0);
+        std::shared_ptr<SCompiledShaderCode> pPsShaderCode = GetGlobalResource().m_ShaderCompilerDxc.Compile(L"Shaders/GBufferGenPS.hlsl", L"main", L"ps_6_5", nullptr, 0);
 
        m_GBufferGenPso = GraphicsPSO(L"m_GBufferGenPso");
        m_GBufferGenPso.SetRootSignature(m_GBufferGenSig);

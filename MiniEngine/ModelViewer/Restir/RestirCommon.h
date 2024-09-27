@@ -77,3 +77,8 @@ inline std::string ConvertBlobToString(BlotType* pBlob)
     infoLog[pBlob->GetBufferSize()] = 0;
     return std::string(infoLog.data());
 }
+
+inline int DeviceAndRoundUp(int A, int B)
+{
+    return ((A - 1) / B) + 1;
+}

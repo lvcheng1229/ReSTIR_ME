@@ -44,23 +44,23 @@ void CRestirRayTracer::GenerateInitialSampling(GraphicsContext& context)
 
     context.TransitionResource(g_SceneGBufferA, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(g_SceneGBufferB, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    context.TransitionResource(g_ReservoirRayDirection, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    context.TransitionResource(g_ReservoirRayDirection[0], D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
     context.FlushResourceBarriers();
 
     // srv uav cbv
     context.SetDynamicDescriptor(0, 0, g_SceneGBufferA.GetSRV());
     context.SetDynamicDescriptor(0, 1, g_SceneGBufferB.GetSRV());
     context.SetDynamicDescriptor(0, 2, rayTracingTlas.GetSRV());
-    context.SetDynamicDescriptor(1, 0, g_ReservoirRayDirection.GetUAV());
-    context.SetDynamicConstantBufferView(2, sizeof(SRestirSceneInfo), &GetGlobalResource().restirSceneInfo);
+    context.SetDynamicDescriptor(1, 0, g_ReservoirRayDirection[0].GetUAV());
+    context.SetDynamicConstantBufferView(2, sizeof(SRestirSceneInfoTemp), &GetGlobalResource().restirSceneInfoTemp);
     context.RayTracingCommitDescTable();
 
     //pRaytracingCommandList->SetComputeRootDescriptorTable(4, g_OutputUAV);
 
-    D3D12_DISPATCH_RAYS_DESC rayDispatchDesc = CreateRayTracingDesc(g_ReservoirRayDirection.GetWidth(), g_ReservoirRayDirection.GetHeight());
+    D3D12_DISPATCH_RAYS_DESC rayDispatchDesc = CreateRayTracingDesc(g_ReservoirRayDirection[0].GetWidth(), g_ReservoirRayDirection[0].GetHeight());
     pRaytracingCommandList->DispatchRays(&rayDispatchDesc);
 
-    context.TransitionResource(g_ReservoirRayDirection, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    context.TransitionResource(g_ReservoirRayDirection[0], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     context.FlushResourceBarriers();
     
 }

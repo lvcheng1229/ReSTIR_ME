@@ -60,6 +60,7 @@
     <ClCompile Include="RestirME.cpp" />
     <ClCompile Include="Restir\RestirGBufferGen.cpp" />
     <ClCompile Include="Restir\RestirGlobalResource.cpp" />
+    <ClCompile Include="Restir\RestirIntegrateAndDenoise.cpp" />
     <ClCompile Include="Restir\RestirRayTracer.cpp" />
     <ClCompile Include="Restir\RestirRayTracerBackEnd.cpp" />
     <ClCompile Include="Restir\RestirResampling.cpp" />
@@ -364,6 +365,7 @@
     <ClInclude Include="Restir\RestirCommon.h" />
     <ClInclude Include="Restir\RestirGBufferGen.h" />
     <ClInclude Include="Restir\RestirGlobalResource.h" />
+    <ClInclude Include="Restir\RestirIntegrateAndDenoise.h" />
     <ClInclude Include="Restir\RestirRayTracer.h" />
     <ClInclude Include="Restir\RestirResampling.h" />
     <ClInclude Include="Restir\ShaderCompile.h" />

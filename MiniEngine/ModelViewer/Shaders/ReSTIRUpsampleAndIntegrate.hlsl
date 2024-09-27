@@ -1,25 +1,28 @@
 #define GROUP_SIZE 16
 
-Texture3D<float> stbn_scalar_tex: register(t7);
-
 #include "ReSTIRCommon.hlsl"
 
 Texture2D<float4> reservoir_ray_direction : register(t0);
-Texture2D<float3> reservoir_ray_radiance : register(t1);
+Texture2D<float4> reservoir_ray_radiance : register(t1);
 Texture2D<float>  reservoir_hit_distance : register(t2);
-Texture2D<float3> reservoir_hit_normal : register(t3);
-Texture2D<float3> reservoir_weights : register(t4);
+Texture2D<float4> reservoir_hit_normal : register(t3);
+Texture2D<float4> reservoir_weights : register(t4);
 
-Texture2D<float4> gbuffer_world_pos : register(t5);
 Texture2D<float4> gbuffer_world_normal : register(t5); // xyz, world normal, w roughness
+Texture2D<float4> gbuffer_world_pos : register(t6); //gbuffer b
 
-Texture2D<float3> fullres_scene_depth : register(t5);
+Texture3D<float> stbn_scalar_tex: register(t7);
+Texture2D<float4> downsampled_world_pos : register(t8);
 
-Texture2D<float3> downsampled_world_pos : register(t5);
+RWTexture2D<float4> output_diffuse_indirect : register(u0);
+RWTexture2D<float4> output_specular_indirect : register(u1);
 
-RWTexture2D<float3> output_diffuse_indirect : register(u0);
-RWTexture2D<float3> output_specular_indirect : register(u1);
+cbuffer CBRestirSceneInfo : register(b0)
+{
+    RESTIR_SCENE_INFO_COMMON
+};
 
+// from unrealengine
 float D_GGX( float a2, float NoH )
 {
 	float d = ( NoH * a2 - NoH ) * NoH + 1;	// 2 mad
@@ -39,16 +42,16 @@ void UpscaleAndIntegrateCS(uint2 dispatch_thread_id : SV_DispatchThreadID)
         float4 scene_plane = float4(world_normal, dot(world_position, world_normal));
         float3 vec_to_camera = g_camera_worldpos - world_position;
         float3 view_direction = normalize(vec_to_camera);
-        float distance_to_camera = lenght(vec_to_camera);
+        float distance_to_camera = length(vec_to_camera);
 
         const uint upscale_number_sample = 16;
         const float upscale_kernel_size = 3.0;
         const float kernel_scale = upscale_kernel_size * 2.0 * 4.0 / upscale_number_sample;
 
-        float noise = GetBlueNoiseScalar(current_pixel_pos, g_current_frame_index);
+        float noise = GetBlueNoiseScalar(stbn_scalar_tex, current_pixel_pos, g_current_frame_index);
 
         float3 weighted_diffuse_lighting = 0;
-        float3 weighted_specular_lighting = 0
+        float3 weighted_specular_lighting = 0;
         float total_weight = 0;
 
         //float mean = 0.0;
@@ -62,7 +65,7 @@ void UpscaleAndIntegrateCS(uint2 dispatch_thread_id : SV_DispatchThreadID)
             const int2 reservoir_pixel_offset = int2(floor(float2(cos(angle), sin(angle)) * radius));
             uint2 reservior_sample_coord = clamp((current_pixel_pos / 2 + reservoir_pixel_offset) , uint2(0,0), int2(g_restir_texturesize) - int2(1,1));
 
-            float3 reservoir_world_position = downsampled_world_pos[reservior_sample_coord];
+            float3 reservoir_world_position = downsampled_world_pos[reservior_sample_coord].xyz;
             if(any(reservoir_world_position != float3(0,0,0)))
             {
                 SReservoir reservoir_sample = LoadReservoir(reservior_sample_coord, reservoir_ray_direction, reservoir_ray_radiance, reservoir_hit_distance, reservoir_hit_normal, reservoir_weights);
@@ -76,7 +79,7 @@ void UpscaleAndIntegrateCS(uint2 dispatch_thread_id : SV_DispatchThreadID)
                 weighted_diffuse_lighting += sample_light * depth_weight * max(dot(world_normal, reservoir_sample.m_sample.ray_direction),0.0f);
 
                 // specular lighting
-                float3 H = normalize(view_direction, reservoir_sample.m_sample.ray_direction);
+                float3 H = normalize(view_direction + reservoir_sample.m_sample.ray_direction);
                 float NoH = saturate(dot(world_normal, H));
                 float D = D_GGX(,NoH);
                 const float Vis_Implicit = 0.25;
@@ -95,17 +98,14 @@ void UpscaleAndIntegrateCS(uint2 dispatch_thread_id : SV_DispatchThreadID)
 
          float3 diffuse_lighting = (total_weight > 0.0) ? weighted_diffuse_lighting / total_weight : 0.0;
          float3 specular_lighting = (total_weight > 0.0) ? weighted_specular_lighting / total_weight : 0.0;
-         //float reservoir_radiance = (total_weight > 0.0) ? s / total_weight : 0.0;
 
-         output_diffuse_indirect[current_pixel_pos] = diffuse_lighting / 3.1415926535;
-         output_specular_indirect[current_pixel_pos] = specular_lighting;
-         //output_resolve_variance[current_pixel_pos] = min(reservoir_radiance, DISOCCLUSION_VARIANCE - 0.1f);
+         output_diffuse_indirect[current_pixel_pos] = float4(diffuse_lighting / 3.1415926535, 1.0);
+         output_specular_indirect[current_pixel_pos] = float4(specular_lighting, 1.0);
     }
     else
     {
-        output_diffuse_indirect[current_pixel_pos] = float3(0,0,0);
-        output_specular_indirect[current_pixel_pos] = float3(0,0,0);
-        //output_resolve_variance[current_pixel_pos] = 0.0f;
+        output_diffuse_indirect[current_pixel_pos] = float4(0,0,0,1);
+        output_specular_indirect[current_pixel_pos] = float4(0,0,0,1);
     }
 
    

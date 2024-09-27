@@ -31,7 +31,16 @@ namespace Graphics
     ColorBuffer g_SceneGBufferA;
     ColorBuffer g_SceneGBufferB;
 
-    ColorBuffer g_ReservoirRayDirection;
+    ColorBuffer g_ReservoirRayDirection[3]; // R16G16B16A16_FLOAT Half Res
+    ColorBuffer g_ReservoirRayRadiance[3];  // R16G16B16_FLOAT Half Res
+    ColorBuffer g_ReservoirRayDistance[3];  // R16_FLOAT Half Res
+    ColorBuffer g_ReservoirRayNormal[3];    // R16G16B16_FLOAT Half Res
+    ColorBuffer g_ReservoirRayWeights[3];    // R16G16B16_FLOAT Half ResColorBuffer g_SSAOFullScreen(Color(1.0f, 1.0f, 1.0f));
+    ColorBuffer g_DownSampledWorldPosition[3];    // R16G16B16_FLOAT Half ResColorBuffer g_LinearDepth[2];
+    ColorBuffer g_DownSampledWorldNormal[3];    // R16G16B16_FLOAT Half ResColorBuffer g_MinMaxDepth8;
+
+    ColorBuffer g_RestirDiffuseIndirect[2];
+    ColorBuffer g_RestirSpecularIndirect[2];
 
     ShadowBuffer g_ShadowBuffer;
 
@@ -122,7 +131,23 @@ void Graphics::InitializeRenderingBuffers( uint32_t bufferWidth, uint32_t buffer
 
         g_SceneGBufferA.Create(L"g_SceneGBufferA", bufferWidth, bufferHeight, 1, DXGI_FORMAT_R16G16B16A16_FLOAT, esram);
         g_SceneGBufferB.Create(L"g_SceneGBufferB", bufferWidth, bufferHeight, 1, DXGI_FORMAT_R16G16B16A16_FLOAT, esram);
-        g_ReservoirRayDirection.Create(L"g_ReservoirRayDirection", bufferWidth / 2, bufferHeight / 2, 1, DXGI_FORMAT_R16G16B16A16_FLOAT, esram);
+
+        for (int index = 0; index < 3; index++)
+        {
+            g_ReservoirRayDirection[index].Create(L"g_ReservoirRayDirection", bufferWidth / 2, bufferHeight / 2, 1, DXGI_FORMAT_R16G16B16A16_FLOAT, esram);
+            g_ReservoirRayRadiance[index].Create(L"g_ReservoirRayRadiance", bufferWidth / 2, bufferHeight / 2, 1, DXGI_FORMAT_R16G16B16A16_FLOAT, esram);
+            g_ReservoirRayDistance[index].Create(L"g_ReservoirRayDistance", bufferWidth / 2, bufferHeight / 2, 1, DXGI_FORMAT_R16_FLOAT, esram);
+            g_ReservoirRayNormal[index].Create(L"g_ReservoirRayNormal", bufferWidth / 2, bufferHeight / 2, 1, DXGI_FORMAT_R16G16B16A16_FLOAT, esram);
+            g_ReservoirRayWeights[index].Create(L"g_ReservoirRayWeights", bufferWidth / 2, bufferHeight / 2, 1, DXGI_FORMAT_R16G16B16A16_FLOAT, esram);
+            g_DownSampledWorldPosition[index].Create(L"g_DownSampledWorldPosition", bufferWidth / 2, bufferHeight / 2, 1, DXGI_FORMAT_R16G16B16A16_FLOAT, esram);
+            g_DownSampledWorldNormal[index].Create(L"g_DownSampledWorldNormal", bufferWidth / 2, bufferHeight / 2, 1, DXGI_FORMAT_R16G16B16A16_FLOAT, esram);
+        }
+        
+        g_RestirDiffuseIndirect[0].Create(L"g_RestirDiffuseIndirect0", bufferWidth, bufferHeight, 1, DXGI_FORMAT_R16G16B16A16_FLOAT, esram);
+        g_RestirDiffuseIndirect[1].Create(L"g_RestirDiffuseIndirect1", bufferWidth, bufferHeight, 1, DXGI_FORMAT_R16G16B16A16_FLOAT, esram);
+
+        g_RestirSpecularIndirect[0].Create(L"g_RestirSpecularIndirect0", bufferWidth, bufferHeight, 1, DXGI_FORMAT_R16G16B16A16_FLOAT, esram);
+        g_RestirSpecularIndirect[1].Create(L"g_RestirSpecularIndirect1", bufferWidth, bufferHeight, 1, DXGI_FORMAT_R16G16B16A16_FLOAT, esram);
 
         esram.PushStack();	// Render HDR image
 
