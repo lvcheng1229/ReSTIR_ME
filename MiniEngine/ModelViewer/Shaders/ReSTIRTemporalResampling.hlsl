@@ -1,6 +1,6 @@
 #define GROUP_SIZE 16
 
-Texture3D<float> stbn_scalar_tex: register(t7);
+Texture3D<float> stbn_scalar_tex: register(t14);
 
 #include "ReSTIRCommon.hlsl"
 
@@ -18,14 +18,14 @@ Texture2D<float3> reservoir_weights : register(t4);
 Texture2D<float3> downsampled_world_pos : register(t5);
 Texture2D<float3> downsampled_world_normal : register(t6);
 
-Texture2D<float4> history_reservoir_ray_direction : register(t0);
-Texture2D<float3> history_reservoir_ray_radiance : register(t1);
-Texture2D<float>  history_reservoir_hit_distance : register(t2);
-Texture2D<float3> history_reservoir_hit_normal : register(t3);
-Texture2D<float3> history_reservoir_weights : register(t4);
+Texture2D<float4> history_reservoir_ray_direction : register(t7);
+Texture2D<float3> history_reservoir_ray_radiance : register(t8);
+Texture2D<float>  history_reservoir_hit_distance : register(t9);
+Texture2D<float3> history_reservoir_hit_normal : register(t10);
+Texture2D<float3> history_reservoir_weights : register(t11);
 
-Texture2D<float3> history_downsampled_world_pos : register(t5);
-Texture2D<float3> history_downsampled_world_normal : register(t6);
+Texture2D<float3> history_downsampled_world_pos : register(t12);
+Texture2D<float3> history_downsampled_world_normal : register(t13);
 
 RWTexture2D<float4> rw_reservoir_ray_direction : register(u0);
 RWTexture2D<float3> rw_reservoir_ray_radiance : register(u1);

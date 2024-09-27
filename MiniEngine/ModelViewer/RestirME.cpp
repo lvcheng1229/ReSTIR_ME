@@ -1,6 +1,82 @@
+#define ENABLE_PIX_FRAME_CAPTURE 0
+#define PIX_CAPUTRE_LOAD_FROM_DLL 0
+
 #include "Restir/RestirGBufferGen.h"
 #include "Restir/RestirGlobalResource.h"
 #include "Restir/RestirRayTracer.h"
+#include "Restir/RestirResampling.h"
+
+#if ENABLE_PIX_FRAME_CAPTURE
+#if !PIX_CAPUTRE_LOAD_FROM_DLL
+#include "pix3.h"
+#endif
+#endif
+
+#if ENABLE_PIX_FRAME_CAPTURE && PIX_CAPUTRE_LOAD_FROM_DLL
+
+#define PIX_CAPTURE_TIMING (1 << 0)
+#define PIX_CAPTURE_GPU (1 << 1)
+#define PIX_CAPTURE_FUNCTION_SUMMARY (1 << 2)
+#define PIX_CAPTURE_FUNCTION_DETAILS (1 << 3)
+#define PIX_CAPTURE_CALLGRAPH (1 << 4)
+#define PIX_CAPTURE_INSTRUCTION_TRACE (1 << 5)
+#define PIX_CAPTURE_SYSTEM_MONITOR_COUNTERS (1 << 6)
+#define PIX_CAPTURE_VIDEO (1 << 7)
+#define PIX_CAPTURE_AUDIO (1 << 8)
+#define PIX_CAPTURE_GPU_TRACE (1 << 9)
+#define PIX_CAPTURE_RESERVED (1 << 15)
+
+union PIXCaptureParameters {
+    enum PIXCaptureStorage {
+        Memory = 0,
+        MemoryCircular = 1, // Xbox only
+        FileCircular = 2, // PC only
+    };
+
+    struct GpuCaptureParameters {
+        PCWSTR FileName;
+    } GpuCaptureParameters;
+
+    struct TimingCaptureParameters {
+        PCWSTR FileName;
+        UINT32 MaximumToolingMemorySizeMb;
+        PIXCaptureStorage CaptureStorage;
+
+        BOOL CaptureGpuTiming;
+
+        BOOL CaptureCallstacks;
+        BOOL CaptureCpuSamples;
+        UINT32 CpuSamplesPerSecond;
+
+        BOOL CaptureFileIO;
+
+        BOOL CaptureVirtualAllocEvents;
+        BOOL CaptureHeapAllocEvents;
+        BOOL CaptureXMemEvents; // Xbox only
+        BOOL CapturePixMemEvents; // Xbox only
+    } TimingCaptureParameters;
+
+    struct GpuTraceParameters // Xbox Series and newer only
+    {
+        PWSTR FileName;
+        UINT32 MaximumToolingMemorySizeMb;
+
+        BOOL CaptureGpuOccupancy;
+
+    } GpuTraceParameters;
+};
+
+typedef PIXCaptureParameters* PPIXCaptureParameters;
+
+typedef HRESULT(__stdcall* PIXBeginCapture2_API)(DWORD captureFlags, const PPIXCaptureParameters captureParameters);
+typedef HRESULT(__stdcall* PIXEndCapture_API)(BOOL discard);
+
+static PIXBeginCapture2_API PIXBeginCapture2 = nullptr;
+static PIXEndCapture_API PIXEndCapture = nullptr;
+
+inline HRESULT PIXBeginCapture(DWORD captureFlags, const PPIXCaptureParameters captureParameters) { return PIXBeginCapture2(captureFlags, captureParameters); }
+
+#endif
 
 using namespace GameCore;
 using namespace Math;
@@ -13,7 +89,7 @@ class RestirApp : public GameCore::IGameApp
 {
 public:
 
-    RestirApp( void ) {}
+    RestirApp(void);
 
     virtual void Startup( void ) override;
     virtual void Cleanup( void ) override;
@@ -33,7 +109,25 @@ private:
     ShadowCamera m_SunShadowCamera;
     CRestirRayTracer restirRayTracer;
     CGBufferGenPass m_GBufferGenPass;
+    CRestirResamplingPass restirResamplingPass;
+
+#if ENABLE_PIX_FRAME_CAPTURE
+    HMODULE m_pixModule;
+#endif
 };
+
+RestirApp::RestirApp(void)
+{
+#if ENABLE_PIX_FRAME_CAPTURE
+#if PIX_CAPUTRE_LOAD_FROM_DLL
+    m_pixModule = LoadLibrary(m_deviceInifConfig.m_pixCaptureDllPath.c_str());
+    PIXBeginCapture2 = (PIXBeginCapture2_API)GetProcAddress(m_pixModule, "PIXBeginCapture2");
+    PIXEndCapture = (PIXEndCapture_API)GetProcAddress(m_pixModule, "PIXEndCapture");
+#else
+    m_pixModule = PIXLoadLatestWinPixGpuCapturerLibrary();
+#endif
+#endif
+}
 
 CREATE_APPLICATION( RestirApp )
 
@@ -220,6 +314,33 @@ void RestirApp::Update( float deltaT )
 
 void RestirApp::RenderScene( void )
 {
+#if ENABLE_PIX_FRAME_CAPTURE
+    static int PixFrameIndex = 0;
+
+    if (PixFrameIndex == 14)
+    {
+#if ENABLE_PIX_FRAME_CAPTURE
+#if PIX_CAPUTRE_LOAD_FROM_DLL
+        std::wstring pixPath = WstringConverter().from_bytes(m_deviceInifConfig.m_pixCaptureSavePath);
+        PIXCaptureParameters pixCaptureParameters;
+        pixCaptureParameters.GpuCaptureParameters.FileName = pixPath.c_str();
+        PIXBeginCapture(PIX_CAPTURE_GPU, &pixCaptureParameters);
+#else
+        std::wstring pixPath = L"H:\ReSTIR_ME\MiniEngine\Build\x64\Debug\Output\Restir\pix.wpix";
+        PIXCaptureParameters pixCaptureParameters;
+        pixCaptureParameters.GpuCaptureParameters.FileName = pixPath.c_str();
+        PIXBeginCapture(PIX_CAPTURE_GPU, &pixCaptureParameters);
+#endif
+#endif
+    }
+
+    if (PixFrameIndex == 15)
+    {
+        PIXEndCapture(false);
+    }
+
+    PixFrameIndex++;
+#endif
     GraphicsContext& gfxContext = GraphicsContext::Begin(L"Scene Render");
 
     const D3D12_VIEWPORT& viewport = m_MainViewport;

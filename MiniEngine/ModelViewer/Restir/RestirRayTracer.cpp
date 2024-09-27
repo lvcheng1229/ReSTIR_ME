@@ -31,32 +31,36 @@ void CRestirRayTracer::Init()
 
 void CRestirRayTracer::GenerateInitialSampling(GraphicsContext& context)
 {
-    ComputeContext& ctx = context.GetComputeContext();
     ID3D12GraphicsCommandList* pCommandList = context.GetCommandList();
 
     ComPtr<ID3D12GraphicsCommandList4> pRaytracingCommandList;
     pCommandList->QueryInterface(IID_PPV_ARGS(&pRaytracingCommandList));
-
+    
     // Ray Tracing Hack
     pRaytracingCommandList->SetPipelineState1(rayTracingPipelineState.m_pRtPipelineState);
-    ctx.SetRootSignature(TempRootSignature);
+    context.SetRootSignature(TempRootSignature);
 
     pRaytracingCommandList->SetComputeRootSignature(rayTracingPipelineState.m_pGlobalRootSig);
 
-    ctx.TransitionResource(g_SceneGBufferA, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    ctx.TransitionResource(g_SceneGBufferB, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    ctx.FlushResourceBarriers();
+    context.TransitionResource(g_SceneGBufferA, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    context.TransitionResource(g_SceneGBufferB, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    context.TransitionResource(g_ReservoirRayDirection, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    context.FlushResourceBarriers();
 
     // srv uav cbv
-    ctx.SetDynamicDescriptor(0, 0, g_SceneGBufferA.GetSRV());
-    ctx.SetDynamicDescriptor(0, 1, g_SceneGBufferB.GetSRV());
-    ctx.SetDynamicDescriptor(0, 2, rayTracingTlas.GetSRV());
-    ctx.SetDynamicDescriptor(1, 0, g_ReservoirRayDirection.GetUAV());
-    ctx.SetDynamicConstantBufferView(2, sizeof(SRestirSceneInfo), &GetGlobalResource().restirSceneInfo);
-    ctx.RayTracingCommitDescTable();
+    context.SetDynamicDescriptor(0, 0, g_SceneGBufferA.GetSRV());
+    context.SetDynamicDescriptor(0, 1, g_SceneGBufferB.GetSRV());
+    context.SetDynamicDescriptor(0, 2, rayTracingTlas.GetSRV());
+    context.SetDynamicDescriptor(1, 0, g_ReservoirRayDirection.GetUAV());
+    context.SetDynamicConstantBufferView(2, sizeof(SRestirSceneInfo), &GetGlobalResource().restirSceneInfo);
+    context.RayTracingCommitDescTable();
 
     //pRaytracingCommandList->SetComputeRootDescriptorTable(4, g_OutputUAV);
 
     D3D12_DISPATCH_RAYS_DESC rayDispatchDesc = CreateRayTracingDesc(g_ReservoirRayDirection.GetWidth(), g_ReservoirRayDirection.GetHeight());
     pRaytracingCommandList->DispatchRays(&rayDispatchDesc);
+
+    context.TransitionResource(g_ReservoirRayDirection, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    context.FlushResourceBarriers();
+    
 }

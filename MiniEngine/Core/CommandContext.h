@@ -263,7 +263,7 @@ public:
     void DrawIndirect( GpuBuffer& ArgumentBuffer, uint64_t ArgumentBufferOffset = 0 );
     void ExecuteIndirect(CommandSignature& CommandSig, GpuBuffer& ArgumentBuffer, uint64_t ArgumentStartOffset = 0,
         uint32_t MaxCommands = 1, GpuBuffer* CommandCounterBuffer = nullptr, uint64_t CounterOffset = 0);
-
+    void RayTracingCommitDescTable();
 private:
 };
 
@@ -303,7 +303,7 @@ public:
     void DispatchIndirect( GpuBuffer& ArgumentBuffer, uint64_t ArgumentBufferOffset = 0 );
     void ExecuteIndirect(CommandSignature& CommandSig, GpuBuffer& ArgumentBuffer, uint64_t ArgumentStartOffset = 0,
         uint32_t MaxCommands = 1, GpuBuffer* CommandCounterBuffer = nullptr, uint64_t CounterOffset = 0);
-    void RayTracingCommitDescTable();
+   
 
 private:
 };
@@ -713,6 +713,14 @@ inline void GraphicsContext::ExecuteIndirect(CommandSignature& CommandSig,
         CommandCounterBuffer == nullptr ? nullptr : CommandCounterBuffer->GetResource(), CounterOffset);
 }
 
+inline void GraphicsContext::RayTracingCommitDescTable()
+{
+    FlushResourceBarriers();
+    m_DynamicViewDescriptorHeap.CommitGraphicsRootDescriptorTables(m_CommandList);
+    m_DynamicSamplerDescriptorHeap.CommitGraphicsRootDescriptorTables(m_CommandList);
+}
+
+
 inline void GraphicsContext::DrawIndirect(GpuBuffer& ArgumentBuffer, uint64_t ArgumentBufferOffset)
 {
     ExecuteIndirect(Graphics::DrawIndirectCommandSignature, ArgumentBuffer, ArgumentBufferOffset);
@@ -730,10 +738,6 @@ inline void ComputeContext::ExecuteIndirect(CommandSignature& CommandSig,
         CommandCounterBuffer == nullptr ? nullptr : CommandCounterBuffer->GetResource(), CounterOffset);
 }
 
-inline void ComputeContext::RayTracingCommitDescTable()
-{
-    m_DynamicViewDescriptorHeap.CommitComputeRootDescriptorTables(m_CommandList);
-}
 
 inline void ComputeContext::DispatchIndirect( GpuBuffer& ArgumentBuffer, uint64_t ArgumentBufferOffset )
 {

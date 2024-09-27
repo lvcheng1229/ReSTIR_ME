@@ -62,6 +62,7 @@
     <ClCompile Include="Restir\RestirGlobalResource.cpp" />
     <ClCompile Include="Restir\RestirRayTracer.cpp" />
     <ClCompile Include="Restir\RestirRayTracerBackEnd.cpp" />
+    <ClCompile Include="Restir\RestirResampling.cpp" />
     <ClCompile Include="Restir\ShaderCompile.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -364,6 +365,7 @@
     <ClInclude Include="Restir\RestirGBufferGen.h" />
     <ClInclude Include="Restir\RestirGlobalResource.h" />
     <ClInclude Include="Restir\RestirRayTracer.h" />
+    <ClInclude Include="Restir\RestirResampling.h" />
     <ClInclude Include="Restir\ShaderCompile.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
