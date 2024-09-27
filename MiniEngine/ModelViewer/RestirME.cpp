@@ -1,4 +1,4 @@
-#define ENABLE_PIX_FRAME_CAPTURE 0
+#define ENABLE_PIX_FRAME_CAPTURE 1
 #define PIX_CAPUTRE_LOAD_FROM_DLL 0
 
 #include "Restir/RestirGBufferGen.h"
@@ -332,7 +332,7 @@ void RestirApp::RenderScene( void )
         pixCaptureParameters.GpuCaptureParameters.FileName = pixPath.c_str();
         PIXBeginCapture(PIX_CAPTURE_GPU, &pixCaptureParameters);
 #else
-        std::wstring pixPath = L"H:\ReSTIR_ME\MiniEngine\Build\x64\Debug\Output\Restir\pix.wpix";
+        std::wstring pixPath = L"H:/ReSTIR_ME/MiniEngine/Build/x64/Debug/Output/Restir/pix.wpix";
         PIXCaptureParameters pixCaptureParameters;
         pixCaptureParameters.GpuCaptureParameters.FileName = pixPath.c_str();
         PIXBeginCapture(PIX_CAPTURE_GPU, &pixCaptureParameters);

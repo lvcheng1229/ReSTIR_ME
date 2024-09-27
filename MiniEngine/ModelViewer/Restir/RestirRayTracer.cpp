@@ -19,40 +19,47 @@ void CRestirRayTracer::Init()
     ThrowIfFailed(g_Device->QueryInterface(IID_PPV_ARGS(&pRaytracingDevice)), L"Couldn't get DirectX Raytracing interface for the device.\n");
     InitAccelerationStructure();
     CreateRTPipelineStateAndShaderTable();
+    InitDesc();
 
-    {
-        TempRootSignature.Reset(3, 0);
-        TempRootSignature[0].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 3, D3D12_SHADER_VISIBILITY_ALL);
-        TempRootSignature[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1, D3D12_SHADER_VISIBILITY_ALL);
-        TempRootSignature[2].InitAsConstantBuffer(0);
-        TempRootSignature.Finalize(L"TempRootSignature", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-    }
+    //{
+    //    TempRootSignature.Reset(3, 0);
+    //    TempRootSignature[0].InitAsConstantBuffer(0);
+    //    TempRootSignature[2].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 3, D3D12_SHADER_VISIBILITY_ALL);
+    //    TempRootSignature[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1, D3D12_SHADER_VISIBILITY_ALL);
+    //    TempRootSignature.Finalize(L"TempRootSignature", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+    //}
 }
 
 void CRestirRayTracer::GenerateInitialSampling(GraphicsContext& context)
 {
-    ID3D12GraphicsCommandList* pCommandList = context.GetCommandList();
-
-    ComPtr<ID3D12GraphicsCommandList4> pRaytracingCommandList;
-    pCommandList->QueryInterface(IID_PPV_ARGS(&pRaytracingCommandList));
-    
-    // Ray Tracing Hack
-    pRaytracingCommandList->SetPipelineState1(rayTracingPipelineState.m_pRtPipelineState);
-    context.SetRootSignature(TempRootSignature);
-
-    pRaytracingCommandList->SetComputeRootSignature(rayTracingPipelineState.m_pGlobalRootSig);
-
     context.TransitionResource(g_SceneGBufferA, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(g_SceneGBufferB, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(g_ReservoirRayDirection[0], D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
     context.FlushResourceBarriers();
 
+    ID3D12GraphicsCommandList* pCommandList = context.GetCommandList();
+
+    ComPtr<ID3D12GraphicsCommandList4> pRaytracingCommandList;
+    pCommandList->QueryInterface(IID_PPV_ARGS(&pRaytracingCommandList));
+    
+    ID3D12DescriptorHeap* pDescriptorHeaps[] = { &pRaytracingDescriptorHeap->GetDescriptorHeap() };
+    pRaytracingCommandList->SetDescriptorHeaps(ARRAYSIZE(pDescriptorHeaps), pDescriptorHeaps);
+    pRaytracingCommandList->SetPipelineState1(rayTracingPipelineState.m_pRtPipelineState);
+    pRaytracingCommandList->SetComputeRootSignature(rayTracingPipelineState.m_pGlobalRootSig);
+    
+    pCommandList->SetComputeRootDescriptorTable(0, g_SceneSrvs);
+
+    context.SetRootSignature(TempRootSignature);
+
+
+
+
     // srv uav cbv
-    context.SetDynamicDescriptor(0, 0, g_SceneGBufferA.GetSRV());
-    context.SetDynamicDescriptor(0, 1, g_SceneGBufferB.GetSRV());
-    context.SetDynamicDescriptor(0, 2, rayTracingTlas.GetSRV());
+    context.SetDynamicDescriptor(2, 0, g_SceneGBufferA.GetSRV());
+    context.SetDynamicDescriptor(2, 1, g_SceneGBufferB.GetSRV());
+    context.SetDynamicDescriptor(2, 2, rayTracingTlas.GetSRV());
     context.SetDynamicDescriptor(1, 0, g_ReservoirRayDirection[0].GetUAV());
-    context.SetDynamicConstantBufferView(2, sizeof(SRestirSceneInfoTemp), &GetGlobalResource().restirSceneInfoTemp);
+    context.SetDynamicConstantBufferView(0, sizeof(SRestirSceneInfoTemp), &GetGlobalResource().restirSceneInfoTemp);
     context.RayTracingCommitDescTable();
 
     //pRaytracingCommandList->SetComputeRootDescriptorTable(4, g_OutputUAV);
@@ -62,5 +69,4 @@ void CRestirRayTracer::GenerateInitialSampling(GraphicsContext& context)
 
     context.TransitionResource(g_ReservoirRayDirection[0], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     context.FlushResourceBarriers();
-    
 }
