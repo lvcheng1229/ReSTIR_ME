@@ -101,7 +101,7 @@ public:
 		m_descriptorHeapCpuBase = m_pDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 	}
 
-	ID3D12DescriptorHeap& GetDescriptorHeap() { return *m_pDescriptorHeap.Get(); }
+	ID3D12DescriptorHeap& GetDescriptorHeap() { return *m_pDescriptorHeap; }
 
 	void AllocateDescriptor(_Out_ D3D12_CPU_DESCRIPTOR_HANDLE& cpuHandle, _Out_ UINT& descriptorHeapIndex)
 	{
@@ -147,13 +147,21 @@ public:
 	}
 private:
 	ID3D12Device& m_device;
-	ComPtr<ID3D12DescriptorHeap> m_pDescriptorHeap;
+	ID3D12DescriptorHeapPtr m_pDescriptorHeap;
 	UINT m_descriptorsAllocated = 0;
 	UINT m_descriptorSize;
 	D3D12_CPU_DESCRIPTOR_HANDLE m_descriptorHeapCpuBase;
 };
 
+ID3D12RootSignaturePtr CreateRootSignature(ID3D12Device5Ptr pDevice, const D3D12_ROOT_SIGNATURE_DESC1& desc);
 
+struct SGlobalRootSignature
+{
+	void Init(ID3D12Device5Ptr pDevice, CDxRayTracingPipelineState* pDxRayTracingPipelineState);
+	ID3D12RootSignaturePtr m_pRootSig;
+	ID3D12RootSignature* m_pInterface = nullptr;
+	D3D12_STATE_SUBOBJECT m_subobject = {};
+};
 
 class CRestirRayTracer
 {
@@ -175,8 +183,12 @@ private:
 	ID3D12Device5Ptr pRaytracingDevice;
 	SRayTracingPSOCreateDesc rtPsoDesc;
 
+	SGlobalRootSignature globalRootSignature;
+
 	//RootSignature TempRootSignature;
 	std::unique_ptr<DescriptorHeapStack> pRaytracingDescriptorHeap;
+
+	ByteAddressBuffer rayTracingConstantBuffer;
 
 	D3D12_GPU_DESCRIPTOR_HANDLE gBufferARTCopySRV;
 	D3D12_GPU_DESCRIPTOR_HANDLE gBufferBRTCopySRV;

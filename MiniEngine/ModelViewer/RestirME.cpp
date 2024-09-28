@@ -1,4 +1,4 @@
-#define ENABLE_PIX_FRAME_CAPTURE 1
+#define ENABLE_PIX_FRAME_CAPTURE 0
 #define PIX_CAPUTRE_LOAD_FROM_DLL 0
 
 #include "Restir/RestirGBufferGen.h"
@@ -397,6 +397,25 @@ void RestirApp::RenderScene( void )
         globals.SunDirection = SunDirection;
         globals.SunIntensity = Vector3(Scalar(g_SunLightIntensity));
 
+        // generate gbuffer
+        {
+            MeshSorter gBufferGenwSorter(MeshSorter::kRestirGBuffer);
+            gBufferGenwSorter.SetCamera(m_Camera);
+            gBufferGenwSorter.SetViewport(viewport);
+            gBufferGenwSorter.SetScissor(scissor);
+            m_ModelInst.Render(gBufferGenwSorter);
+            gBufferGenwSorter.Sort();
+
+            globals.ViewProjMatrix = m_Camera.GetViewProjMatrix();
+            globals.CameraPos = m_Camera.GetPosition();
+
+            m_GBufferGenPass.GenerateGBuffer(gfxContext, globals, gBufferGenwSorter.GetSortObject());
+        }
+
+        {
+            restirRayTracer.GenerateInitialSampling(gfxContext);
+        }
+
         // Begin rendering depth
         gfxContext.TransitionResource(g_SceneDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);
         gfxContext.ClearDepth(g_SceneDepthBuffer);
@@ -422,6 +441,7 @@ void RestirApp::RenderScene( void )
         {
             ScopedTimer _outerprof(L"Main Render", gfxContext);
 
+
             {
                 ScopedTimer _prof(L"Sun Shadow Map", gfxContext);
 
@@ -435,24 +455,11 @@ void RestirApp::RenderScene( void )
                 shadowSorter.RenderMeshes(MeshSorter::kZPass, gfxContext, globals);
             }
 
-            // generate gbuffer
-            {
-                MeshSorter gBufferGenwSorter(MeshSorter::kRestirGBuffer);
-                gBufferGenwSorter.SetCamera(m_Camera);
-                gBufferGenwSorter.SetViewport(viewport);
-                gBufferGenwSorter.SetScissor(scissor);
-                m_ModelInst.Render(gBufferGenwSorter);
-                gBufferGenwSorter.Sort();
-                
-                globals.ViewProjMatrix = m_Camera.GetViewProjMatrix();
-                globals.CameraPos = m_Camera.GetPosition();
 
-                m_GBufferGenPass.GenerateGBuffer(gfxContext, globals, gBufferGenwSorter.GetSortObject());
-            }
 
-            {
-                restirRayTracer.GenerateInitialSampling(gfxContext);
-            }
+
+
+
 
             gfxContext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
             gfxContext.ClearColor(g_SceneColorBuffer);

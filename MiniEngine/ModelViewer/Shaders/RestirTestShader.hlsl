@@ -17,9 +17,9 @@ struct SRayTracingIntersectionAttributes
     float y;
 };
 
-Texture2D<float4> gbuffer_a: register(t0);
-Texture2D<float4> gbuffer_b: register(t1);
-RaytracingAccelerationStructure rtScene : register(t2);
+RaytracingAccelerationStructure rtScene : register(t0);
+Texture2D<float4> gbuffer_a: register(t1);
+Texture2D<float4> gbuffer_b: register(t2);
 
 RWTexture2D<float4> debug_rt: register(u0);
 
@@ -35,38 +35,77 @@ void InitialSamplingRayGen()
 {
 	uint2 reservoir_coord = DispatchRaysIndex().xy;
 
+    float3 world_normal = (float3)0;
+    float3 world_position = (float3)0;
+
+    bool is_valid_sample = true;
     if(reservoir_coord.x < g_restir_texturesize.x && reservoir_coord.y < g_restir_texturesize.y)
     {
-        float2 reservpor_uv = float2(reservoir_coord.xy) / float2(g_restir_texturesize.xy);
-        uint2 gbuffer_pos = (reservpor_uv) * g_full_screen_texsize.xy;
+        float2 reservior_uv = float2(reservoir_coord.xy) / float2(g_restir_texturesize.xy);
+        uint2 gbuffer_pos = (reservior_uv) * g_full_screen_texsize.xy;
 
-        float3 world_position = gbuffer_b.Load(int3(gbuffer_pos.xy,0)).xyz;
-		float3 world_normal = gbuffer_a.Load(int3(gbuffer_pos.xy,0)).xyz;
-
-		RayDesc ray;
-        ray.Origin = world_position + world_normal * 0.005;
-        ray.Direction = light_direction.xyz;
-        ray.TMin = 0.05;
-        ray.TMax = 1e10;
-
-		SInitialSamplingRayPayLoad payLoad = (SInitialSamplingRayPayLoad)0;
-        //TraceRay(rtScene, RAY_FLAG_FORCE_OPAQUE, RAY_TRACING_MASK_OPAQUE, RT_MATERIAL_SHADER_INDEX, 1,0, ray, payLoad);
-        float4 outputresult = (float4)0;
-        if(payLoad.hit_t > 0.0)
+        if((gbuffer_pos.x < g_full_screen_texsize.x) && (gbuffer_pos.y < g_full_screen_texsize.y))
         {
-            outputresult = float4(0.0,0.0,1.0,0.0);
+            world_position = gbuffer_b[gbuffer_pos.xy].xyz;
+		    world_normal = gbuffer_a[gbuffer_pos.xy].xyz;
+            world_normal = normalize(world_normal);
+
+            if(all(world_position == float3(0,0,0)))
+            {
+                is_valid_sample = false;
+            }
         }
         else
         {
-            outputresult = float4(0.0,0.0,0.0,0.0);
+            is_valid_sample = false;
         }
-
-        debug_rt[reservoir_coord] = outputresult;
 	}
+
+    if(is_valid_sample == false)
+    {
+        //todo: clear
+        debug_rt[reservoir_coord] = float4(0,0,0,0);
+        return;
+    }
+
+    RayDesc ray;
+    ray.Origin = world_position;
+    ray.Direction = light_direction.xyz;
+    ray.TMin = 0.05;
+    ray.TMax = 1e10;
+
+	SInitialSamplingRayPayLoad payLoad = (SInitialSamplingRayPayLoad)0;
+    TraceRay(rtScene, RAY_FLAG_FORCE_OPAQUE, ~0/*RAY_TRACING_MASK_OPAQUE*/, 0, 1,0, ray, payLoad);
+
+    float4 outputresult = (float4)0;
+    if(payLoad.hit_t > 0.0)
+    {
+        outputresult = float4(0.0,0.0,abs(payLoad.hit_t),0.0);
+    }
+    else if(payLoad.hit_t == -1.0)
+    {
+        outputresult = float4(1.0,0.0,0.0,0.0);
+    }
+    else
+    {
+        outputresult = float4(0.0, abs(payLoad.hit_t), 0.0,0.0);
+    }
+
+    debug_rt[reservoir_coord] = outputresult;
 }
 
 [shader("closesthit")]
 void InitialSamplingRayHit(inout SInitialSamplingRayPayLoad payload, in SRayTracingIntersectionAttributes attributes)
 {
-	payload.hit_t = RayTCurrent();;
+	payload.hit_t = RayTCurrent();
+    if(payload.hit_t == 0.0)
+    {
+        payload.hit_t = 10.0f;
+    }
+}
+
+[shader("miss")]
+void RayMiassMain(inout SInitialSamplingRayPayLoad payload)
+{
+    payload.hit_t = -1.0;
 }

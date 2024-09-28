@@ -37,7 +37,7 @@ void CGBufferGenPass::Init()
        m_GBufferGenPso.SetRootSignature(m_GBufferGenSig);
        m_GBufferGenPso.SetRasterizerState(RasterizerDefault);
        m_GBufferGenPso.SetBlendState(BlendDisable);
-       m_GBufferGenPso.SetDepthStencilState(DepthStateReadOnly); 
+       m_GBufferGenPso.SetDepthStencilState(DepthStateReadWrite);
        m_GBufferGenPso.SetInputLayout(_countof(vertElem), vertElem);
        m_GBufferGenPso.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
        m_GBufferGenPso.SetRenderTargetFormats(2, GBufferFormat, DepthFormat);
@@ -72,15 +72,20 @@ void CGBufferGenPass::GenerateGBuffer(GraphicsContext& context, GlobalConstants&
 
     D3D12_CPU_DESCRIPTOR_HANDLE RTVs[2] = { g_SceneGBufferA.GetRTV() ,g_SceneGBufferB.GetRTV() };
 
-    context.TransitionResource(g_SceneDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_READ);
     context.TransitionResource(g_SceneGBufferA, D3D12_RESOURCE_STATE_RENDER_TARGET);
     context.TransitionResource(g_SceneGBufferB, D3D12_RESOURCE_STATE_RENDER_TARGET);
-    context.SetRenderTargets(2, RTVs, g_SceneDepthBuffer.GetDSV_DepthReadOnly());
+    context.TransitionResource(g_SceneDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+    context.SetRenderTargets(2, RTVs, g_SceneDepthBuffer.GetDSV());
+
+    context.ClearDepth(g_SceneDepthBuffer);
+    context.ClearColor(g_SceneGBufferA);
+    context.ClearColor(g_SceneGBufferB);
 
     context.SetViewportAndScissor(Viewport, Scissor);
     context.FlushResourceBarriers();
 
     context.SetPipelineState(m_GBufferGenPso);
+
 
     for (int idx = 0; idx < sortObjects.size(); idx++)
     {

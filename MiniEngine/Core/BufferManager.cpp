@@ -285,6 +285,26 @@ void Graphics::DestroyRenderingBuffers()
     g_HorizontalBuffer.Destroy();
     g_PostEffectsBuffer.Destroy();
 
+    g_SceneGBufferA.Destroy();
+    g_SceneGBufferB.Destroy();
+
+    for (int Index = 0; Index < 3; Index++)
+    {
+        g_ReservoirRayDirection[Index].Destroy();
+        g_ReservoirRayRadiance[Index].Destroy();
+        g_ReservoirRayDistance[Index].Destroy();
+        g_ReservoirRayNormal[Index].Destroy();
+        g_ReservoirRayWeights[Index].Destroy();
+        g_DownSampledWorldPosition[Index].Destroy();
+        g_DownSampledWorldNormal[Index].Destroy();
+    }
+
+    g_RestirDiffuseIndirect[0].Destroy();
+    g_RestirSpecularIndirect[0].Destroy();
+
+    g_RestirDiffuseIndirect[1].Destroy();
+    g_RestirSpecularIndirect[1].Destroy();
+
     g_ShadowBuffer.Destroy();
 
     g_SSAOFullScreen.Destroy();
