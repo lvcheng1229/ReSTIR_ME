@@ -55,24 +55,19 @@ float4 UniformSampleHemisphere( float2 E )
 	return float4( H, PDF );
 }
 
-// From Unreal MonteCarlo.ush
-float3x3 GetTangentBasisFrisvad(float3 TangentZ)
+float Pow2(float x)
 {
-	float3 TangentX;
-	float3 TangentY;
+    return x * x;
+}
 
-	if (TangentZ.z < -0.9999999f)
-	{
-		TangentX = float3(0, -1, 0);
-		TangentY = float3(-1, 0, 0);
-	}
-	else
-	{
-		float A = 1.0f / (1.0f + TangentZ.z);
-		float B = -TangentZ.x * TangentZ.y * A;
-		TangentX = float3(1.0f - TangentZ.x * TangentZ.x * A, B, -TangentZ.x);
-		TangentY = float3(B, 1.0f - TangentZ.y * TangentZ.y * A, -TangentZ.y);
-	}
+float3x3 GetTangentBasis( float3 TangentZ )
+{
+	const float Sign = TangentZ.z >= 0 ? 1 : -1;
+	const float a = -rcp( Sign + TangentZ.z );
+	const float b = TangentZ.x * TangentZ.y * a;
+	
+	float3 TangentX = { 1 + Sign * a * Pow2( TangentZ.x ), Sign * b, -Sign * TangentZ.x };
+	float3 TangentY = { b,  Sign + a * Pow2( TangentZ.y ), -TangentZ.y };
 
 	return float3x3( TangentX, TangentY, TangentZ );
 }
@@ -215,15 +210,18 @@ void InitialSamplingRayGen()
 
     float2 E = GetBlueNoiseVector2(stbn_vec2_tex3d, reservoir_coord, g_current_frame_index);
     float4 hemi_sphere_sample = UniformSampleHemisphere(E);
-    float3x3 tangent_basis = GetTangentBasisFrisvad(world_normal);
+    float3x3 tangent_basis = GetTangentBasis(world_normal);
 
+    //TODO: fix me !!!!!!!!!!!!!!!!!!!!!!!!!!
     float3 local_ray_direction = hemi_sphere_sample.xyz;
     float3 world_ray_direction = normalize(mul(local_ray_direction, tangent_basis));
 
     RayDesc ray;
-    ray.Origin = world_position;
+    ray.Origin = world_position + world_normal * 0.00005f;
     ray.Direction = world_ray_direction;
-    ray.TMin = 0.05;
+
+    //TODO: fix me !!!!!!!!!!!!!!!!!!!!!!!!!!
+    ray.TMin = 0.0;
     ray.TMax = 1e10;
 
     SInitialSamplingRayPayLoad payLoad = (SInitialSamplingRayPayLoad)0;
@@ -240,8 +238,8 @@ void InitialSamplingRayGen()
     if(payLoad.hit_t > 0.0)
     {
         RayDesc shadow_ray;
-        shadow_ray.Origin = payLoad.world_position;
-        shadow_ray.TMin = 0.05f;
+        shadow_ray.Origin = payLoad.world_position + payLoad.world_normal * 0.00005f;
+        shadow_ray.TMin = 0.0;
         shadow_ray.Direction = light_direction.xyz;
         shadow_ray.TMax = payLoad.hit_t;
 
@@ -254,28 +252,33 @@ void InitialSamplingRayGen()
             radiance = NoL * SUN_INTENSITY * payLoad.albedo * (1.0 / PI);
         }
 
-        radiance = payLoad.albedo;
-
-        SSample initial_sample;
-        initial_sample.ray_direction = ray.Direction;
-        initial_sample.radiance = radiance;
-        initial_sample.hit_distance = payLoad.hit_t;
-        initial_sample.hit_normal = payLoad.world_normal;
-        initial_sample.pdf = hemi_sphere_sample.w;
-
-        float target_pdf = Luminance(radiance);
-        float w = target_pdf / initial_sample.pdf;
-
-        SReservoir reservoir;
-        InitializeReservoir(reservoir);
-        UpdateReservoir(reservoir, initial_sample, w, 0);
-        reservoir.m_sample.pdf = target_pdf;
-        reservoir.comb_weight = reservoir.weight_sum / (max(reservoir.M * reservoir.m_sample.pdf, 0.00001f));
-
-        StoreReservoir(reservoir_coord, reservoir, rw_reservoir_ray_direction, rw_reservoir_ray_radiance, rw_reservoir_hit_distance, rw_reservoir_hit_normal, rw_reservoir_weights);
-
-
+        // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        //radiance = payLoad.albedo;
     }
+    else
+    {
+        radiance = float3(0.2,0.2,0.2);
+        payLoad.world_normal = -ray.Direction;
+    }
+        
+
+    SSample initial_sample;
+    initial_sample.ray_direction = ray.Direction;
+    initial_sample.radiance = radiance;
+    initial_sample.hit_distance = payLoad.hit_t;
+    initial_sample.hit_normal = payLoad.world_normal;
+    initial_sample.pdf = hemi_sphere_sample.w;
+
+    float target_pdf = Luminance(radiance);
+    float w = target_pdf / initial_sample.pdf;
+
+    SReservoir reservoir;
+    InitializeReservoir(reservoir);
+    UpdateReservoir(reservoir, initial_sample, w, 0);
+    reservoir.m_sample.pdf = target_pdf;
+    reservoir.comb_weight = reservoir.weight_sum / (max(reservoir.M * reservoir.m_sample.pdf, 0.00001f));
+
+    StoreReservoir(reservoir_coord, reservoir, rw_reservoir_ray_direction, rw_reservoir_ray_radiance, rw_reservoir_hit_distance, rw_reservoir_hit_normal, rw_reservoir_weights);
 }
 
 uint3 Load3x16BitIndices(
