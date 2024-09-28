@@ -1,6 +1,8 @@
 #include "RestirGBufferGen.h"
 #include "RestirGlobalResource.h"
 #include "ShaderCompile.h"
+#include "SponzaRenderer.h"
+#include "ModelH3D.h"
 
 using namespace Graphics;
 
@@ -86,23 +88,29 @@ void CGBufferGenPass::GenerateGBuffer(GraphicsContext& context, GlobalConstants&
 
     context.SetPipelineState(m_GBufferGenPso);
 
+    auto& m_Model = Sponza::GetModel();
+    context.SetIndexBuffer(m_Model.GetIndexBuffer());
+    context.SetVertexBuffer(0, m_Model.GetVertexBuffer());
 
-    for (int idx = 0; idx < sortObjects.size(); idx++)
+    __declspec(align(16)) uint32_t materialIdx = 0xFFFFFFFFul;
+    uint32_t VertexStride = m_Model.GetVertexStride();
+
+    context.SetDynamicConstantBufferView(0, sizeof(GlobalConstants), &globals);
+
+    for (uint32_t meshIndex = 0; meshIndex < m_Model.GetMeshCount(); meshIndex++)
     {
-        const ReSortObject& object = sortObjects[idx];
-        const Mesh& mesh = *object.mesh;
+        const ModelH3D::Mesh& mesh = m_Model.GetMesh(meshIndex);
 
-        context.SetConstantBuffer(0, object.meshCBV);
-        context.SetDynamicConstantBufferView(1, sizeof(GlobalConstants), &globals);
+        uint32_t indexCount = mesh.indexCount;
+        uint32_t startIndex = mesh.indexDataByteOffset / sizeof(uint16_t);
+        uint32_t baseVertex = mesh.vertexDataByteOffset / VertexStride;
 
-        context.SetDescriptorTable(2, Renderer::s_TextureHeap[mesh.srvTable]);
-        context.SetVertexBuffer(0, { object.bufferPtr + mesh.vbOffset, mesh.vbSize, mesh.vbStride });
-        context.SetIndexBuffer({ object.bufferPtr + mesh.ibOffset, mesh.ibSize, (DXGI_FORMAT)mesh.ibFormat });
-
-        for (uint32_t i = 0; i < mesh.numDraws; ++i)
+        if (mesh.materialIndex != materialIdx)
         {
-            context.DrawIndexed(mesh.draw[i].primCount, mesh.draw[i].startIndex, mesh.draw[i].baseVertex);
+            materialIdx = mesh.materialIndex;
+            context.SetDescriptorTable(Renderer::kMaterialSRVs, m_Model.GetSRVs(materialIdx));
         }
+
+        context.DrawIndexed(indexCount, startIndex, baseVertex);
     }
-   
 }

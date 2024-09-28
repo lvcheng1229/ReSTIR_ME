@@ -16,7 +16,7 @@ struct SOutGBuffer
 	float4 gbufferB : SV_Target1;
 };
 
-Texture2D<float3> texNormal					: register(t4);
+Texture2D<float3> texNormal			: register(t3);
 SamplerState defaultTextureSampler       	: register(s0);
 
 SOutGBuffer main(VSOutput vsOutput)

@@ -362,22 +362,22 @@ void RestirApp::RenderScene( void )
     }
     else
     {
-        // Update global constants
-        float costheta = cosf(g_SunOrientation);
-        float sintheta = sinf(g_SunOrientation);
-        float cosphi = cosf(g_SunInclination * 3.14159f * 0.5f);
-        float sinphi = sinf(g_SunInclination * 3.14159f * 0.5f);
 
-        Vector3 SunDirection = Normalize(Vector3( costheta * cosphi, sinphi, sintheta * cosphi ));
+        float costheta = cosf(Sponza::m_SunOrientation);
+        float sintheta = sinf(Sponza::m_SunOrientation);
+        float cosphi = cosf(Sponza::m_SunInclination * 3.14159f * 0.5f);
+        float sinphi = sinf(Sponza::m_SunInclination * 3.14159f * 0.5f);
+        Vector3 SunDirection = Normalize(Vector3(costheta * cosphi, sinphi, sintheta * cosphi));
+
         Vector3 ShadowBounds = Vector3(m_ModelInst.GetRadius());
-        //m_SunShadowCamera.UpdateMatrix(-SunDirection, m_ModelInst.GetCenter(), ShadowBounds,
         m_SunShadowCamera.UpdateMatrix(-SunDirection, Vector3(0, -500.0f, 0), Vector3(5000, 3000, 3000),
             (uint32_t)g_ShadowBuffer.GetWidth(), (uint32_t)g_ShadowBuffer.GetHeight(), 16);
 
         {
-            GetGlobalResource().restirSceneInfoTemp.lightDirection = DirectX::XMFLOAT3(SunDirection.GetX(), SunDirection.GetY(), SunDirection.GetZ()) ;
-            GetGlobalResource().restirSceneInfoTemp.fullScreenTextureSize = DirectX::XMFLOAT4(g_SceneGBufferA.GetWidth(), g_SceneGBufferA.GetHeight(), 1.0 / g_SceneGBufferA.GetWidth(), 1.0 / g_SceneGBufferA.GetHeight());
-            GetGlobalResource().restirSceneInfoTemp.restirTextureSize = DirectX::XMFLOAT4(g_ReservoirRayDirection[0].GetWidth(), g_ReservoirRayDirection[0].GetHeight(), 1.0 / g_ReservoirRayDirection[0].GetWidth(), 1.0 / g_ReservoirRayDirection[0].GetHeight());
+            GetGlobalResource().restirSRayTracingInfo.lightDirection = DirectX::XMFLOAT3(SunDirection.GetX(), SunDirection.GetY(), SunDirection.GetZ()) ;
+            GetGlobalResource().restirSRayTracingInfo.fullScreenTextureSize = DirectX::XMFLOAT4(g_SceneGBufferA.GetWidth(), g_SceneGBufferA.GetHeight(), 1.0 / g_SceneGBufferA.GetWidth(), 1.0 / g_SceneGBufferA.GetHeight());
+            GetGlobalResource().restirSRayTracingInfo.restirTextureSize = DirectX::XMFLOAT4(g_ReservoirRayDirection[0].GetWidth(), g_ReservoirRayDirection[0].GetHeight(), 1.0 / g_ReservoirRayDirection[0].GetWidth(), 1.0 / g_ReservoirRayDirection[0].GetHeight());
+            GetGlobalResource().restirSRayTracingInfo.currentFrameIndex++;
 
             GetGlobalResource().restirSceneInfo.PreViewProjMatrix = pre_view_matrix;
             GetGlobalResource().restirSceneInfo.g_restir_texturesize = DirectX::XMFLOAT2(g_ReservoirRayDirection[0].GetWidth(), g_ReservoirRayDirection[0].GetHeight());
@@ -416,69 +416,8 @@ void RestirApp::RenderScene( void )
             restirRayTracer.GenerateInitialSampling(gfxContext);
         }
 
-        // Begin rendering depth
-        gfxContext.TransitionResource(g_SceneDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);
-        gfxContext.ClearDepth(g_SceneDepthBuffer);
-
-        MeshSorter sorter(MeshSorter::kDefault);
-		sorter.SetCamera(m_Camera);
-		sorter.SetViewport(viewport);
-		sorter.SetScissor(scissor);
-		sorter.SetDepthStencilTarget(g_SceneDepthBuffer);
-		sorter.AddRenderTarget(g_SceneColorBuffer);
-
-        m_ModelInst.Render(sorter);
-
-        sorter.Sort();
-
-        {
-            ScopedTimer _prof(L"Depth Pre-Pass", gfxContext);
-            sorter.RenderMeshes(MeshSorter::kZPass, gfxContext, globals);
-        }
-
-        SSAO::Render(gfxContext, m_Camera);
-
-        {
-            ScopedTimer _outerprof(L"Main Render", gfxContext);
-
-
-            {
-                ScopedTimer _prof(L"Sun Shadow Map", gfxContext);
-
-                MeshSorter shadowSorter(MeshSorter::kShadows);
-				shadowSorter.SetCamera(m_SunShadowCamera);
-				shadowSorter.SetDepthStencilTarget(g_ShadowBuffer);
-
-                m_ModelInst.Render(shadowSorter);
-
-                shadowSorter.Sort();
-                shadowSorter.RenderMeshes(MeshSorter::kZPass, gfxContext, globals);
-            }
-
-
-
-
-
-
-
-            gfxContext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
-            gfxContext.ClearColor(g_SceneColorBuffer);
-
-            {
-                ScopedTimer _prof(L"Render Color", gfxContext);
-
-                gfxContext.TransitionResource(g_SSAOFullScreen, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-                gfxContext.TransitionResource(g_SceneDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_READ);
-                gfxContext.SetRenderTarget(g_SceneColorBuffer.GetRTV(), g_SceneDepthBuffer.GetDSV_DepthReadOnly());
-                gfxContext.SetViewportAndScissor(viewport, scissor);
-
-                sorter.RenderMeshes(MeshSorter::kOpaque, gfxContext, globals);
-            }
-
-            Renderer::DrawSkybox(gfxContext, m_Camera, viewport, scissor);
-
-            sorter.RenderMeshes(MeshSorter::kTransparent, gfxContext, globals);
-        }
+        SSAO::Enable = false;
+        Sponza::RenderScene(gfxContext, m_Camera, viewport, scissor);
     }
 
     gfxContext.Finish();

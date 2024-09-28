@@ -167,8 +167,11 @@ void CRestirRayTracer::InitAccelerationStructure()
    
        instanceDesc.AccelerationStructure = blas->GetGPUVirtualAddress();
        instanceDesc.Flags = 0;
-       instanceDesc.InstanceID = 0;
+       //stanceDesc.InstanceID = 0;
+       instanceDesc.InstanceID = i;
+
        instanceDesc.InstanceMask = 1;
+
        //instanceDesc.InstanceContributionToHitGroupIndex = i;
        instanceDesc.InstanceContributionToHitGroupIndex = 0;
    }
@@ -215,7 +218,7 @@ void CRestirRayTracer::InitAccelerationStructure()
    pRaytracingCommandList->ResourceBarrier(1, &uavBarrier);
    pRaytracingCommandList->BuildRaytracingAccelerationStructure(&topLevelAccelerationStructureDesc, 0, nullptr);
    
-   rayTracingConstantBuffer.Create(L"rayTracingConstantBuffer", 1, sizeof(SRestirSceneInfoTemp));
+   rayTracingConstantBuffer.Create(L"rayTracingConstantBuffer", 1, sizeof(SRestirRayTracingInfo));
 
 
    gfxContext.Finish(true);
@@ -438,69 +441,130 @@ void CRestirRayTracer::CreateRTPipelineStateAndShaderTable()
 
 void CRestirRayTracer::InitDesc()
 {
+    // desc table 0:
+    // gbuffer a / gbuffer b / rt_scene_mesh_gpu_data / scene_idx_buffer / scene_vtx_buffer / stbn_vec2_tex3d
+    const ModelH3D& model = Sponza::GetModel();
     D3D12_CPU_DESCRIPTOR_HANDLE srvHandle;
-    UINT srvDescriptorIndex;
-
+    UINT unusedIndex;
     {
+        UINT srvDescriptorIndex;
         pRaytracingDescriptorHeap->AllocateDescriptor(srvHandle, srvDescriptorIndex);
         Graphics::g_Device->CopyDescriptorsSimple(1, srvHandle, g_SceneGBufferA.GetSRV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-        gBufferARTCopySRV = pRaytracingDescriptorHeap->GetGpuHandle(srvDescriptorIndex);
+        raytracingResources = pRaytracingDescriptorHeap->GetGpuHandle(srvDescriptorIndex);
     }
 
     {
-        pRaytracingDescriptorHeap->AllocateDescriptor(srvHandle, srvDescriptorIndex);
+        pRaytracingDescriptorHeap->AllocateDescriptor(srvHandle, unusedIndex);
         Graphics::g_Device->CopyDescriptorsSimple(1, srvHandle, g_SceneGBufferB.GetSRV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-        gBufferBRTCopySRV = pRaytracingDescriptorHeap->GetGpuHandle(srvDescriptorIndex);
     }
 
+    {
+        std::vector<RayTraceMeshInfo>   meshInfoData(model.m_Header.meshCount);
+        for (UINT i = 0; i < model.m_Header.meshCount; ++i)
+        {
+            meshInfoData[i].m_indexOffsetBytes = model.m_pMesh[i].indexDataByteOffset;
+            meshInfoData[i].m_uvAttributeOffsetBytes = model.m_pMesh[i].vertexDataByteOffset + model.m_pMesh[i].attrib[ModelH3D::attrib_texcoord0].offset;
+            meshInfoData[i].m_normalAttributeOffsetBytes = model.m_pMesh[i].vertexDataByteOffset + model.m_pMesh[i].attrib[ModelH3D::attrib_normal].offset;
+            meshInfoData[i].m_positionAttributeOffsetBytes = model.m_pMesh[i].vertexDataByteOffset + model.m_pMesh[i].attrib[ModelH3D::attrib_position].offset;
+            meshInfoData[i].m_tangentAttributeOffsetBytes = model.m_pMesh[i].vertexDataByteOffset + model.m_pMesh[i].attrib[ModelH3D::attrib_tangent].offset;
+            meshInfoData[i].m_bitangentAttributeOffsetBytes = model.m_pMesh[i].vertexDataByteOffset + model.m_pMesh[i].attrib[ModelH3D::attrib_bitangent].offset;
+            meshInfoData[i].m_attributeStrideBytes = model.m_pMesh[i].vertexStride;
+            meshInfoData[i].m_materialInstanceId = model.m_pMesh[i].materialIndex;
+            ASSERT(meshInfoData[i].m_materialInstanceId < 27);
+        }
+
+        hitShaderMeshInfoBuffer.Create(L"RayTraceMeshInfo", (UINT)meshInfoData.size(), sizeof(meshInfoData[0]), meshInfoData.data());
+        D3D12_CPU_DESCRIPTOR_HANDLE SceneMeshInfo = hitShaderMeshInfoBuffer.GetSRV();
+        pRaytracingDescriptorHeap->AllocateDescriptor(srvHandle, unusedIndex);
+        Graphics::g_Device->CopyDescriptorsSimple(1, srvHandle, SceneMeshInfo, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    }
+
+    {
+        pRaytracingDescriptorHeap->AllocateDescriptor(srvHandle, unusedIndex);
+        Sponza::GetModel().CreateIndexBufferSRV(srvHandle);
+    }
+
+    {
+        pRaytracingDescriptorHeap->AllocateDescriptor(srvHandle, unusedIndex);
+        Sponza::GetModel().CreateVertexBufferSRV(srvHandle);
+    }
+
+    {
+        pRaytracingDescriptorHeap->AllocateDescriptor(srvHandle, unusedIndex);
+        Graphics::g_Device->CopyDescriptorsSimple(1, srvHandle, GetGlobalResource().STBNVec2.GetSRV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    }
+
+    // desc table 1: 7 output uav
     for (int index = 0; index < 3; index++)
     {
         {
-            pRaytracingDescriptorHeap->AllocateDescriptor(srvHandle, srvDescriptorIndex);
+            UINT outputReservoirIndex;
+            pRaytracingDescriptorHeap->AllocateDescriptor(srvHandle, outputReservoirIndex);
             Graphics::g_Device->CopyDescriptorsSimple(1, srvHandle, g_ReservoirRayDirection[index].GetUAV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-            rtCopyReservoirRayDirection[index] = pRaytracingDescriptorHeap->GetGpuHandle(srvDescriptorIndex);
+            outputReservoirs[index] = pRaytracingDescriptorHeap->GetGpuHandle(outputReservoirIndex);
         }
 
         {
-            pRaytracingDescriptorHeap->AllocateDescriptor(srvHandle, srvDescriptorIndex);
+            pRaytracingDescriptorHeap->AllocateDescriptor(srvHandle, unusedIndex);
             Graphics::g_Device->CopyDescriptorsSimple(1, srvHandle, g_ReservoirRayRadiance[index].GetUAV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-            rtCopyReservoirRayRadiance[index] = pRaytracingDescriptorHeap->GetGpuHandle(srvDescriptorIndex);
         }
 
         {
-            pRaytracingDescriptorHeap->AllocateDescriptor(srvHandle, srvDescriptorIndex);
+            pRaytracingDescriptorHeap->AllocateDescriptor(srvHandle, unusedIndex);
             Graphics::g_Device->CopyDescriptorsSimple(1, srvHandle, g_ReservoirRayDistance[index].GetUAV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-            rtCopyReservoirRayDistance[index] = pRaytracingDescriptorHeap->GetGpuHandle(srvDescriptorIndex);
         }
 
         {
-            pRaytracingDescriptorHeap->AllocateDescriptor(srvHandle, srvDescriptorIndex);
+            pRaytracingDescriptorHeap->AllocateDescriptor(srvHandle, unusedIndex);
             Graphics::g_Device->CopyDescriptorsSimple(1, srvHandle, g_ReservoirRayNormal[index].GetUAV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-            rtCopyReservoirRayNormal[index] = pRaytracingDescriptorHeap->GetGpuHandle(srvDescriptorIndex);
         }
 
         {
-            pRaytracingDescriptorHeap->AllocateDescriptor(srvHandle, srvDescriptorIndex);
+            pRaytracingDescriptorHeap->AllocateDescriptor(srvHandle, unusedIndex);
             Graphics::g_Device->CopyDescriptorsSimple(1, srvHandle, g_ReservoirRayWeights[index].GetUAV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-            rtCopyReservoirRayWeights[index] = pRaytracingDescriptorHeap->GetGpuHandle(srvDescriptorIndex);
         }
 
         {
-            pRaytracingDescriptorHeap->AllocateDescriptor(srvHandle, srvDescriptorIndex);
+            pRaytracingDescriptorHeap->AllocateDescriptor(srvHandle, unusedIndex);
             Graphics::g_Device->CopyDescriptorsSimple(1, srvHandle, g_DownSampledWorldPosition[index].GetUAV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-            rtCopyDownSampledWorldPosition[index] = pRaytracingDescriptorHeap->GetGpuHandle(srvDescriptorIndex);
         }
 
         {
-            pRaytracingDescriptorHeap->AllocateDescriptor(srvHandle, srvDescriptorIndex);
+            pRaytracingDescriptorHeap->AllocateDescriptor(srvHandle, unusedIndex);
             Graphics::g_Device->CopyDescriptorsSimple(1, srvHandle, g_DownSampledWorldNormal[index].GetUAV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-            rtCopyDownSampledWorldNormal[index] = pRaytracingDescriptorHeap->GetGpuHandle(srvDescriptorIndex);
         }
 
     }
 
+    {
+        const TextureRef* textures = model.GetMaterialTextures(0);
+
+        UINT bindless_start_idx;
+        UINT unused;
+        pRaytracingDescriptorHeap->AllocateDescriptor(srvHandle, bindless_start_idx);       // Diffuse
+        Graphics::g_Device->CopyDescriptorsSimple(1, srvHandle, textures[0].GetSRV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        pRaytracingDescriptorHeap->AllocateDescriptor(srvHandle, unused);     // Normal
+        Graphics::g_Device->CopyDescriptorsSimple(1, srvHandle, textures[2].GetSRV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+        bindlessTableHandle = pRaytracingDescriptorHeap->GetGpuHandle(bindless_start_idx);
+    }
+
+    for (UINT i = 1; i < model.m_Header.materialCount; i++)
+    {
+        const TextureRef* textures = model.GetMaterialTextures(i);
+
+        UINT unused;
+        pRaytracingDescriptorHeap->AllocateDescriptor(srvHandle, unused);       // Diffuse
+        Graphics::g_Device->CopyDescriptorsSimple(1, srvHandle, textures[0].GetSRV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        pRaytracingDescriptorHeap->AllocateDescriptor(srvHandle, unused);     // Normal
+        Graphics::g_Device->CopyDescriptorsSimple(1, srvHandle, textures[2].GetSRV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    }
+
+   
+
 
 }
+
 
 D3D12_DISPATCH_RAYS_DESC CRestirRayTracer::CreateRayTracingDesc(uint32_t width, uint32_t height)
 {

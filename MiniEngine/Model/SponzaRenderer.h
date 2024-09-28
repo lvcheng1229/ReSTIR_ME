@@ -45,5 +45,10 @@ namespace Sponza
     extern ShadowCamera m_SunShadow;
     extern ExpVar m_AmbientIntensity;
     extern ExpVar m_SunLightIntensity;
+    extern std::vector<bool> m_pMaterialIsCutout;
+    enum eObjectFilter { kOpaque = 0x1, kCutout = 0x2, kTransparent = 0x4, kAll = 0xF, kNone = 0x0 };
+
+    extern NumVar m_SunOrientation;
+    extern NumVar m_SunInclination;
 
 }

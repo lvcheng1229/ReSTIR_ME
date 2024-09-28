@@ -273,6 +273,8 @@ void Lighting::FillLightGrid(GraphicsContext& gfxContext, const Camera& camera)
 
     ComputeContext& Context = gfxContext.GetComputeContext();
 
+    return;
+
     Context.SetRootSignature(m_FillLightRootSig);
 
     switch ((int)LightGridDim)

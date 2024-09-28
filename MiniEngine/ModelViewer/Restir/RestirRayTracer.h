@@ -41,14 +41,11 @@ struct SRayTracingPSOCreateDesc
 	SShaderResources rayTracingResources;
 };
 
-
-
 class CDxRayTracingPipelineState
 {
 public:
 	ID3D12RootSignaturePtr m_pGlobalRootSig;
 	ID3D12StateObjectPtr m_pRtPipelineState;
-	//ID3D12ResourcePtr m_pShaderTable;
 	uint32_t m_nShaderNum[4];
 	uint32_t m_slotDescNum[4];
 	
@@ -59,7 +56,6 @@ public:
 	CDxRayTracingPipelineState()
 	{
 		m_pGlobalRootSig = nullptr;
-		//m_pShaderTable = nullptr;
 		m_pRtPipelineState = nullptr;
 		m_nShaderNum[0] = m_nShaderNum[1] = m_nShaderNum[2] = m_nShaderNum[3] = 0;
 		m_slotDescNum[0] = m_slotDescNum[1] = m_slotDescNum[2] = m_slotDescNum[3] = 0;
@@ -69,20 +65,6 @@ public:
 		m_rootConstantRootTableIndex = 0;
 	}
 };
-
-//class CRayTracingTLAS : public GpuResource
-//{
-//public:
-//	CRayTracingTLAS() {};
-//	CRayTracingTLAS(ID3D12Resource* pResource, D3D12_RESOURCE_STATES CurrentState, D3D12_CPU_DESCRIPTOR_HANDLE tlasSRVCpuHandle)
-//		:GpuResource(pResource, CurrentState)
-//		, m_SRVHandle(tlasSRVCpuHandle) {};
-//
-//	const D3D12_CPU_DESCRIPTOR_HANDLE& GetSRV(void) const { return m_SRVHandle; }
-//private:
-//
-//	D3D12_CPU_DESCRIPTOR_HANDLE m_SRVHandle;
-//};
 
 class DescriptorHeapStack
 {
@@ -155,6 +137,18 @@ private:
 
 ID3D12RootSignaturePtr CreateRootSignature(ID3D12Device5Ptr pDevice, const D3D12_ROOT_SIGNATURE_DESC1& desc);
 
+struct RayTraceMeshInfo
+{
+	uint32_t  m_indexOffsetBytes;
+	uint32_t  m_uvAttributeOffsetBytes;
+	uint32_t  m_normalAttributeOffsetBytes;
+	uint32_t  m_tangentAttributeOffsetBytes;
+	uint32_t  m_bitangentAttributeOffsetBytes;
+	uint32_t  m_positionAttributeOffsetBytes;
+	uint32_t  m_attributeStrideBytes;
+	uint32_t  m_materialInstanceId;
+};
+
 struct SGlobalRootSignature
 {
 	void Init(ID3D12Device5Ptr pDevice, CDxRayTracingPipelineState* pDxRayTracingPipelineState);
@@ -175,7 +169,6 @@ private:
 	void InitDesc();
 
 	D3D12_DISPATCH_RAYS_DESC CreateRayTracingDesc(uint32_t width, uint32_t height);
-	//CRayTracingTLAS rayTracingTlas;
 	CDxRayTracingPipelineState rayTracingPipelineState;
 	ID3D12ResourcePtr  tlasResource;
 
@@ -190,14 +183,9 @@ private:
 
 	ByteAddressBuffer rayTracingConstantBuffer;
 
-	D3D12_GPU_DESCRIPTOR_HANDLE gBufferARTCopySRV;
-	D3D12_GPU_DESCRIPTOR_HANDLE gBufferBRTCopySRV;
 
-	D3D12_GPU_DESCRIPTOR_HANDLE rtCopyReservoirRayDirection[3];
-	D3D12_GPU_DESCRIPTOR_HANDLE rtCopyReservoirRayRadiance[3];
-	D3D12_GPU_DESCRIPTOR_HANDLE rtCopyReservoirRayDistance[3]; 
-	D3D12_GPU_DESCRIPTOR_HANDLE rtCopyReservoirRayNormal[3];
-	D3D12_GPU_DESCRIPTOR_HANDLE rtCopyReservoirRayWeights[3];
-	D3D12_GPU_DESCRIPTOR_HANDLE rtCopyDownSampledWorldPosition[3];
-	D3D12_GPU_DESCRIPTOR_HANDLE rtCopyDownSampledWorldNormal[3];
+	D3D12_GPU_DESCRIPTOR_HANDLE outputReservoirs[3];
+	StructuredBuffer    hitShaderMeshInfoBuffer;
+	D3D12_GPU_DESCRIPTOR_HANDLE raytracingResources; // t1 - t6
+	D3D12_GPU_DESCRIPTOR_HANDLE bindlessTableHandle; // bindless
 };

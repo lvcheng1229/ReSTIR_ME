@@ -43,7 +43,7 @@ namespace Sponza
 {
     void RenderLightShadows(GraphicsContext& gfxContext, const Camera& camera);
 
-    enum eObjectFilter { kOpaque = 0x1, kCutout = 0x2, kTransparent = 0x4, kAll = 0xF, kNone = 0x0 };
+    
     void RenderObjects( GraphicsContext& Context, const Matrix4& ViewProjMat, const Vector3& viewerPos, eObjectFilter Filter = kAll );
 
     GraphicsPSO m_DepthPSO = { (L"Sponza: Depth PSO") };

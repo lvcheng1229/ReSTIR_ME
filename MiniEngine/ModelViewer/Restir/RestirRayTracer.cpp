@@ -9,9 +9,10 @@
 using namespace Graphics;
 void CRestirRayTracer::Init()
 {
-    rtPsoDesc.filename = L"Shaders/RestirTestShader.hlsl";
+    rtPsoDesc.filename = L"Shaders/RestirInitialSampling.hlsl";
     rtPsoDesc.rtShaders.push_back(SShader{ ERayShaderType::RAY_RGS ,L"InitialSamplingRayGen" });
 	rtPsoDesc.rtShaders.push_back(SShader{ ERayShaderType::RAY_CHS ,L"InitialSamplingRayHit" });
+	rtPsoDesc.rtShaders.push_back(SShader{ ERayShaderType::RAY_CHS ,L"ShadowClosestHitMain" });
 	rtPsoDesc.rtShaders.push_back(SShader{ ERayShaderType::RAY_MIH ,L"RayMiassMain" });
     rtPsoDesc.rayTracingResources.m_nSRV = 3;
     rtPsoDesc.rayTracingResources.m_nUAV = 1;
@@ -21,14 +22,6 @@ void CRestirRayTracer::Init()
     InitAccelerationStructure();
     CreateRTPipelineStateAndShaderTable();
     InitDesc();
-
-    //{
-    //    TempRootSignature.Reset(3, 0);
-    //    TempRootSignature[0].InitAsConstantBuffer(0);
-    //    TempRootSignature[2].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 3, D3D12_SHADER_VISIBILITY_ALL);
-    //    TempRootSignature[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1, D3D12_SHADER_VISIBILITY_ALL);
-    //    TempRootSignature.Finalize(L"TempRootSignature", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-    //}
 }
 
 static D3D12_STATIC_SAMPLER_DESC MakeStaticSampler(D3D12_FILTER filter, D3D12_TEXTURE_ADDRESS_MODE wrapMode, uint32_t registerIndex, uint32_t space)
@@ -68,13 +61,7 @@ void SGlobalRootSignature::Init(ID3D12Device5Ptr pDevice, CDxRayTracingPipelineS
 	std::vector<D3D12_DESCRIPTOR_RANGE1> descRanges;
 
 	rootParams.resize(5);
-	descRanges.resize(3);
-
-	D3D12_DESCRIPTOR_RANGE1 descRange;
-	descRange.NumDescriptors = 1;
-	descRange.RegisterSpace = 0;
-	descRange.OffsetInDescriptorsFromTableStart = 0;
-	descRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
+	descRanges.resize(2);
 
 	int descRangeIndex = 0;
 	int rootIndex = 0;
@@ -89,8 +76,13 @@ void SGlobalRootSignature::Init(ID3D12Device5Ptr pDevice, CDxRayTracingPipelineS
 		rootIndex++;
 	}
 
-	// Root Desc Table SRV: GBuffer A, GBuffer B
+	// Root Desc Table SRV:  t1 - t6
 	{
+		D3D12_DESCRIPTOR_RANGE1 descRange;
+		descRange.NumDescriptors = 6;
+		descRange.RegisterSpace = 0;
+		descRange.OffsetInDescriptorsFromTableStart = 0;
+		descRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
 		descRange.BaseShaderRegister = 1;
 		descRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE(D3D12_DESCRIPTOR_RANGE_TYPE_SRV);
 		descRanges[descRangeIndex] = descRange;
@@ -103,22 +95,15 @@ void SGlobalRootSignature::Init(ID3D12Device5Ptr pDevice, CDxRayTracingPipelineS
 		rootIndex++;
 	}
 	
-	{
-		descRange.BaseShaderRegister = 2;
-		descRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE(D3D12_DESCRIPTOR_RANGE_TYPE_SRV);
-		descRanges[descRangeIndex] = descRange;
-
-		rootParams[rootIndex].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-		rootParams[rootIndex].DescriptorTable.NumDescriptorRanges = 1;
-		rootParams[rootIndex].DescriptorTable.pDescriptorRanges = &descRanges[descRangeIndex];
-
-		descRangeIndex++;
-		rootIndex++;
-	}
 
 	// Root Desc Table UAV:
 	{
 		
+		D3D12_DESCRIPTOR_RANGE1 descRange;
+		descRange.NumDescriptors = 7;
+		descRange.RegisterSpace = 0;
+		descRange.OffsetInDescriptorsFromTableStart = 0;
+		descRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
 		descRange.BaseShaderRegister = 0;
 		descRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE(D3D12_DESCRIPTOR_RANGE_TYPE_UAV);
 		descRanges[descRangeIndex] = descRange;
@@ -141,44 +126,21 @@ void SGlobalRootSignature::Init(ID3D12Device5Ptr pDevice, CDxRayTracingPipelineS
 		rootIndex++;
 	}
 
-	// bindless byte address buffer
-	//if (rayTracingResources.m_useByteAddressBuffer)
-	//{
-	//	D3D12_DESCRIPTOR_RANGE1 bindlessByteAddressDescRange;
-	//	bindlessByteAddressDescRange.BaseShaderRegister = 0;
-	//	bindlessByteAddressDescRange.NumDescriptors = -1;
-	//	bindlessByteAddressDescRange.RegisterSpace = BINDLESS_BYTE_ADDRESS_BUFFER_SPACE;
-	//	bindlessByteAddressDescRange.OffsetInDescriptorsFromTableStart = 0;
-	//	bindlessByteAddressDescRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
-	//	bindlessByteAddressDescRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE(D3D12_DESCRIPTOR_RANGE_TYPE_SRV);
-	//
-	//	// bindless index buffer and vertex
-	//	rootParams[rootTabbleIndex].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	//	rootParams[rootTabbleIndex].DescriptorTable.NumDescriptorRanges = 1;
-	//	rootParams[rootTabbleIndex].DescriptorTable.pDescriptorRanges = &bindlessByteAddressDescRange;
-	//	pDxRayTracingPipelineState->m_byteBufferBindlessRootTableIndex = rootTabbleIndex;
-	//	rootTabbleIndex++;
-	//}
-	//
-	//// bindless texture 
-	//if (rayTracingResources.m_useBindlessTex2D)
-	//{
-	//	D3D12_DESCRIPTOR_RANGE1 bindlessTexDescRange;
-	//	bindlessTexDescRange.BaseShaderRegister = 0;
-	//	bindlessTexDescRange.NumDescriptors = -1;
-	//	bindlessTexDescRange.RegisterSpace = BINDLESS_TEXTURE_SPACE;
-	//	bindlessTexDescRange.OffsetInDescriptorsFromTableStart = 0;
-	//	bindlessTexDescRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
-	//	bindlessTexDescRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE(D3D12_DESCRIPTOR_RANGE_TYPE_SRV);
-	//
-	//	rootParams[rootTabbleIndex].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	//	rootParams[rootTabbleIndex].DescriptorTable.NumDescriptorRanges = 1;
-	//	rootParams[rootTabbleIndex].DescriptorTable.pDescriptorRanges = &bindlessTexDescRange;
-	//
-	//	pDxRayTracingPipelineState->m_tex2DBindlessRootTableIndex = rootTabbleIndex;
-	//	rootTabbleIndex++;
-	//}
+	{
+		D3D12_DESCRIPTOR_RANGE1 bindlessTexDescRange;
+		bindlessTexDescRange.BaseShaderRegister = 0;
+		bindlessTexDescRange.NumDescriptors = -1;
+		bindlessTexDescRange.RegisterSpace = 2;
+		bindlessTexDescRange.OffsetInDescriptorsFromTableStart = 0;
+		bindlessTexDescRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
+		bindlessTexDescRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE(D3D12_DESCRIPTOR_RANGE_TYPE_SRV);
 
+		rootParams[rootIndex].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		rootParams[rootIndex].DescriptorTable.NumDescriptorRanges = 1;
+		rootParams[rootIndex].DescriptorTable.pDescriptorRanges = &bindlessTexDescRange;
+
+		rootIndex++;
+	}
 
 
 	D3D12_ROOT_SIGNATURE_DESC1 rootSigDesc = {};
@@ -196,12 +158,31 @@ void SGlobalRootSignature::Init(ID3D12Device5Ptr pDevice, CDxRayTracingPipelineS
 
 void CRestirRayTracer::GenerateInitialSampling(GraphicsContext& context)
 {
-    context.WriteBuffer(rayTracingConstantBuffer, 0, &GetGlobalResource().restirSceneInfoTemp, sizeof(SRestirSceneInfoTemp));
+	int cuurentFrameStartIndex = GetGlobalResource().getCurrentFrameBufferIndex();
+	int write_buffer_index = (cuurentFrameStartIndex + 1) % 3;
+
+    context.WriteBuffer(rayTracingConstantBuffer, 0, &GetGlobalResource().restirSRayTracingInfo, sizeof(SRestirRayTracingInfo));
     context.TransitionResource(rayTracingConstantBuffer, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
-    context.TransitionResource(g_SceneGBufferA, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    context.TransitionResource(g_SceneGBufferB, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    context.TransitionResource(g_ReservoirRayDirection[0], D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    context.TransitionResource(g_SceneGBufferA, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	context.TransitionResource(g_SceneGBufferB, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+
+    context.TransitionResource(g_ReservoirRayDirection[write_buffer_index], D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	context.TransitionResource(g_ReservoirRayRadiance[write_buffer_index], D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	context.TransitionResource(g_ReservoirRayDistance[write_buffer_index], D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	context.TransitionResource(g_ReservoirRayNormal[write_buffer_index] , D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	context.TransitionResource(g_ReservoirRayWeights[write_buffer_index], D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	context.TransitionResource(g_DownSampledWorldPosition[write_buffer_index], D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	context.TransitionResource(g_DownSampledWorldNormal[write_buffer_index], D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
     context.FlushResourceBarriers();
+
+	context.ClearUAV(g_ReservoirRayDirection[write_buffer_index]);
+	context.ClearUAV(g_ReservoirRayRadiance[write_buffer_index]);
+	context.ClearUAV(g_ReservoirRayDistance[write_buffer_index]);
+	context.ClearUAV(g_ReservoirRayNormal[write_buffer_index]);
+	context.ClearUAV(g_ReservoirRayWeights[write_buffer_index]);
+	context.ClearUAV(g_DownSampledWorldPosition[write_buffer_index]);
+	context.ClearUAV(g_DownSampledWorldNormal[write_buffer_index]);
 
     ID3D12GraphicsCommandList* pCommandList = context.GetCommandList();
 
@@ -214,10 +195,10 @@ void CRestirRayTracer::GenerateInitialSampling(GraphicsContext& context)
     
     // SRV -> UAV -> CBV
     pRaytracingCommandList->SetComputeRootShaderResourceView(0, tlasResource->GetGPUVirtualAddress());
-    pCommandList->SetComputeRootDescriptorTable(1, gBufferARTCopySRV);
-    pCommandList->SetComputeRootDescriptorTable(2, gBufferBRTCopySRV);
-	pCommandList->SetComputeRootDescriptorTable(3, rtCopyReservoirRayDirection[0]);
-    pCommandList->SetComputeRootConstantBufferView(4, rayTracingConstantBuffer.GetGpuVirtualAddress());
+    pCommandList->SetComputeRootDescriptorTable(1, raytracingResources);
+	pCommandList->SetComputeRootDescriptorTable(2, outputReservoirs[write_buffer_index]);
+	pCommandList->SetComputeRootConstantBufferView(3, rayTracingConstantBuffer.GetGpuVirtualAddress());
+	pCommandList->SetComputeRootDescriptorTable(4, bindlessTableHandle);
 
     D3D12_DISPATCH_RAYS_DESC rayDispatchDesc = CreateRayTracingDesc(g_ReservoirRayDirection[0].GetWidth(), g_ReservoirRayDirection[0].GetHeight());
     pRaytracingCommandList->SetPipelineState1(rayTracingPipelineState.m_pRtPipelineState);

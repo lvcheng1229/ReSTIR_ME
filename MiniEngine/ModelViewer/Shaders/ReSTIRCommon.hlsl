@@ -62,16 +62,16 @@ bool MergeReservoirSample(inout SReservoir reservoir_sample, SReservoir new_rese
     return is_changed;
 }
 
-float2 GetBlueNoiseVector2(Texture3D<float2> stbn_vec2_tex, uint2 screen_position,uint frame_index)
+float2 GetBlueNoiseVector2(Texture2D<float2> stbn_vec2_tex, uint2 screen_position,uint frame_index)
 {
-    uint3 texture_coord_3d = uint3(screen_position.xy, frame_index) & uint3(128,128,64);
-    return stbn_vec2_tex.Load(int4(texture_coord_3d.xyz,0)).xy;
+    uint3 texture_coord_3d = uint3(screen_position.xy, frame_index) % int3(128,128,64);
+    return stbn_vec2_tex.Load(uint3(texture_coord_3d.x, (texture_coord_3d.z * 128) + texture_coord_3d.y,0)).xy;
 }
 
-float GetBlueNoiseScalar(Texture3D<float> stbn_scalar_tex,uint2 screen_position,uint frame_index)
+float GetBlueNoiseScalar(Texture2D<float> stbn_scalar_tex,uint2 screen_position,uint frame_index)
 {
-    uint3 texture_coord_3d = uint3(screen_position.xy, frame_index) & uint3(128,128,64);
-    return stbn_scalar_tex.Load(int4(texture_coord_3d.xyz,0)).x;
+    uint3 texture_coord_3d = uint3(screen_position.xy, frame_index) % int3(128,128,64);
+    return stbn_scalar_tex.Load(uint3(texture_coord_3d.x, (texture_coord_3d.z * 128) + texture_coord_3d.y,0)).x;
 }
 
 //From UnrealEngine

@@ -33,7 +33,7 @@ namespace Lighting
 {
     extern IntVar LightGridDim;
 
-    enum { MaxLights = 128 };
+    enum { MaxLights = 1 };
 
     //LightData m_LightData[MaxLights];
     extern StructuredBuffer m_LightBuffer;

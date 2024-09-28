@@ -11,7 +11,7 @@ Texture2D<float4> reservoir_weights : register(t4);
 Texture2D<float4> gbuffer_world_normal : register(t5); // xyz, world normal, w roughness
 Texture2D<float4> gbuffer_world_pos : register(t6); //gbuffer b
 
-Texture3D<float> stbn_scalar_tex: register(t7);
+Texture2D<float> stbn_scalar_tex: register(t7);
 Texture2D<float4> downsampled_world_pos : register(t8);
 
 RWTexture2D<float4> output_diffuse_indirect : register(u0);

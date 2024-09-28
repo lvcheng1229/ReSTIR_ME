@@ -25,7 +25,7 @@ Texture2D<float4> history_reservoir_weights : register(t11);//xyz only
 
 Texture2D<float4> history_downsampled_world_pos : register(t12);//xyz only
 Texture2D<float4> history_downsampled_world_normal : register(t13);//xyz only
-Texture3D<float> stbn_scalar_tex: register(t14);
+Texture2D<float> stbn_scalar_tex: register(t14);
 
 RWTexture2D<float4> rw_reservoir_ray_direction : register(u0);
 RWTexture2D<float4> rw_reservoir_ray_radiance : register(u1);//xyz only

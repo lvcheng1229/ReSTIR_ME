@@ -1,10 +1,4 @@
-cbuffer MeshConstants : register(b0)
-{
-    float4x4 WorldMatrix;   // Object to world
-    float3x3 WorldIT;       // Object normal to world normal
-};
-
-cbuffer GlobalConstants : register(b1)
+cbuffer GlobalConstants : register(b0)
 {
     float4x4 ViewProjMatrix;
     float4x4 SunShadowMatrix;
@@ -41,10 +35,10 @@ VSOutput main(VSInput vsInput, uint vertexID : SV_VertexID)
     float4 position = float4(vsInput.position, 1.0);
     float3 normal = vsInput.normal * 2 - 1;
 
-    vsOutput.worldPos = mul(WorldMatrix, position).xyz;
+    vsOutput.worldPos = vsInput.position;
     vsOutput.position = mul(ViewProjMatrix, float4(vsOutput.worldPos, 1.0));
     vsOutput.shadowCoord = mul(SunShadowMatrix, float4(vsOutput.worldPos, 1.0)).xyz;
-    vsOutput.normal = mul(WorldIT, normal);
+    vsOutput.normal = vsInput.normal;
     vsOutput.texCoord = vsInput.texcoord0;
     vsOutput.tangent = vsInput.tangent;
     vsOutput.bitangent = vsInput.bitangent;

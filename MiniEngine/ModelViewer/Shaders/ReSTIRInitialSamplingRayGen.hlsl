@@ -1,6 +1,6 @@
 Texture3D<float2> stbn_vec2_tex3d: register(t2);
 
-#include "ReSTIRCommon.hlsl"
+//#include "ReSTIRCommon.hlsl"
 
 struct SMeshGpuData
 {   

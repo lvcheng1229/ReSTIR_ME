@@ -2,13 +2,15 @@
 #include "RestirCommon.h"
 #include "ShaderCompile.h"
 
-struct SRestirSceneInfoTemp
+struct SRestirRayTracingInfo
 {
 	DirectX::XMFLOAT3 lightDirection;
 	float padding1;
 
 	DirectX::XMFLOAT4 restirTextureSize;
 	DirectX::XMFLOAT4 fullScreenTextureSize;
+
+	uint32_t currentFrameIndex = 0;
 };
 
 struct SRestirSceneInfo
@@ -28,7 +30,7 @@ struct SGlobalResource
 {
 	CShaderCompiler m_ShaderCompilerDxc;
 	CShaderCompiler m_ShaderCompilerFxc;
-	SRestirSceneInfoTemp restirSceneInfoTemp;
+	SRestirRayTracingInfo restirSRayTracingInfo;
 	SRestirSceneInfo restirSceneInfo;
 	ModelInstance* pModelInst;
 	int currentFrameIndex;
